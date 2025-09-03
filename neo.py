@@ -10,7 +10,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="Excel Style Aggregator", layout="centered")
 
-st.title("👕 Excel → PDF (Style Aggregator - Fixed Qty)")
+st.title("👕 Excel → PDF (Style Aggregator - Fixed Qty + Robust Style)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -72,8 +72,15 @@ if uploaded_file:
         st.write("### Preview of extracted data")
         st.dataframe(df.head())
 
-        if "Style" not in df.columns:
-            st.error("❌ No 'Style' column found after parsing the file.")
+        # --- Robust Style column detection ---
+        style_col = None
+        for col in df.columns:
+            if "style" in str(col).lower():
+                style_col = col
+                break
+
+        if not style_col:
+            st.error("❌ Could not find a Style column in the file.")
         else:
             # Find the "Total Qty" column
             qty_col = None
@@ -91,10 +98,10 @@ if uploaded_file:
 
             # Build aggregated data
             aggregated_data = []
-            unique_styles = df['Style'].dropna().unique()
+            unique_styles = df[style_col].dropna().unique()
             
             for style in unique_styles:
-                style_rows = df[df['Style'] == style]
+                style_rows = df[df[style_col] == style]
                 if len(style_rows) > 0:
                     first_row = style_rows.iloc[0]
 
