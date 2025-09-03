@@ -10,7 +10,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="Excel Style Aggregator", layout="centered")
 
-st.title("👕 Excel → PDF (Style Aggregator - Fixed Qty v3)")
+st.title("👕 Excel → PDF (Style Aggregator - Fixed Qty v4)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -34,7 +34,7 @@ if uploaded_file:
                 try: brand = row[j+1]
                 except: pass
             elif cell_val == "made in country :":
-                try: 
+                try:
                     made_in = row[j+1]
                     country_of_origin = row[j+1]
                 except: pass
@@ -73,39 +73,42 @@ if uploaded_file:
         st.dataframe(df.head())
 
         # --- Robust Style column detection ---
-       style_col = None
-for col in df.columns:
-    col_clean = str(col).strip().lower()
-    if col_clean.startswith("style"):
-        style_col = col
-        break
+        style_col = None
+        for col in df.columns:
+            col_clean = str(col).strip().lower()
+            if col_clean.startswith("style"):
+                style_col = col
+                break
 
-# --- Robust Qty column detection ---
-qty_col = None
-for col in df.columns:
-    col_clean = str(col).strip().lower()
-    if "total" in col_clean and "qty" in col_clean:
-        qty_col = col
-        break
+        # --- Robust Qty column detection ---
+        qty_col = None
+        for col in df.columns:
+            col_clean = str(col).strip().lower()
+            if "total" in col_clean and "qty" in col_clean:
+                qty_col = col
+                break
 
-# --- Robust FOB detection ---
-fob_col = None
-for col in df.columns:
-    if "fob" in str(col).lower():
-        fob_col = col
-        break
+        # --- Robust FOB detection ---
+        fob_col = None
+        for col in df.columns:
+            if "fob" in str(col).lower():
+                fob_col = col
+                break
 
-# Debug
-st.write("Detected Style column:", style_col)
-st.write("Detected Qty column:", qty_col)
-st.write("Detected FOB column:", fob_col)
-if qty_col:
-    st.write("Sample Qty values:", df[qty_col].head(5).tolist())
+        # Debug
+        st.write("Detected Style column:", style_col)
+        st.write("Detected Qty column:", qty_col)
+        st.write("Detected FOB column:", fob_col)
+        if qty_col:
+            st.write("Sample Qty values:", df[qty_col].head(5).tolist())
 
+        if not style_col or not qty_col:
+            st.error("❌ Could not detect required columns. Please check the Excel format.")
+        else:
             # Build aggregated data
             aggregated_data = []
             unique_styles = df[style_col].dropna().unique()
-            
+
             for style in unique_styles:
                 style_rows = df[df[style_col] == style]
                 if len(style_rows) > 0:
