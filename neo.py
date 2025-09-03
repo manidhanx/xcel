@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v11 Pure)")
+st.title("📑 Proforma Invoice Generator (v11.2 Pure)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -139,9 +139,19 @@ if agg_df is not None:
         bold=ParagraphStyle("bold",parent=normal,fontName="Helvetica-Bold")
 
         elements=[]
+        content_width = A4[0] - 100
 
         # --- Title ---
-        elements.append(Paragraph("<b><font size=14>PROFORMA INVOICE</font></b>",ParagraphStyle("center",alignment=1)))
+        title_table = Table([["PROFORMA INVOICE"]], colWidths=[content_width])
+        title_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),0.75,colors.black),
+            ("ALIGN",(0,0),(-1,-1),"CENTER"),
+            ("FONTNAME",(0,0),(-1,-1),"Helvetica-Bold"),
+            ("FONTSIZE",(0,0),(-1,-1),14),
+            ("TOPPADDING",(0,0),(-1,-1),8),
+            ("BOTTOMPADDING",(0,0),(-1,-1),8),
+        ]))
+        elements.append(title_table)
         elements.append(Spacer(1,12))
 
         # --- Supplier & Consignee Block ---
@@ -161,7 +171,7 @@ if agg_df is not None:
             ["","SWIFT: KKBKINBBCPC"],
             ["","Bank Code: 0323"],
         ]
-        info_table=Table(sup+con,colWidths=[0.5*A4[0],0.5*A4[0]])
+        info_table=Table(sup+con,colWidths=[0.5*content_width,0.5*content_width])
         info_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                         ("VALIGN",(0,0),(-1,-1),"TOP"),
                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
@@ -173,7 +183,7 @@ if agg_df is not None:
             ["<b>Loading Country:</b> "+str(made_in),"<b>Port of Loading:</b> "+str(loading_port)],
             ["<b>Agreed Shipment Date:</b> "+str(ship_date),"<b>Description of goods:</b> "+str(order_of)]
         ]
-        ship_table=Table(ship,colWidths=[0.5*A4[0],0.5*A4[0]])
+        ship_table=Table(ship,colWidths=[0.5*content_width,0.5*content_width])
         ship_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
         elements.append(ship_table)
@@ -185,7 +195,19 @@ if agg_df is not None:
         total_qty=agg_df["QTY"].sum()
         total_amount=agg_df["AMOUNT"].astype(float).sum()
         data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
-        col_widths=[0.12*A4[0],0.25*A4[0],0.10*A4[0],0.10*A4[0],0.20*A4[0],0.08*A4[0],0.05*A4[0],0.05*A4[0],0.05*A4[0]]
+
+        col_widths = [
+            content_width * 0.10,  # STYLE NO
+            content_width * 0.28,  # ITEM DESCRIPTION
+            content_width * 0.09,  # FABRIC TYPE
+            content_width * 0.10,  # H.S NO
+            content_width * 0.15,  # COMPOSITION
+            content_width * 0.08,  # ORIGIN
+            content_width * 0.07,  # QTY
+            content_width * 0.065, # FOB
+            content_width * 0.065  # AMOUNT
+        ]
+
         table=Table(data,colWidths=col_widths,repeatRows=1)
         style=TableStyle([
             ("GRID",(0,0),(-1,-1),0.25,colors.black),
@@ -193,10 +215,14 @@ if agg_df is not None:
             ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
             ("ALIGN",(0,0),(-1,0),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-            ("FONTSIZE",(0,0),(-1,0),7),
-            ("ALIGN",(-3,1),(-1,-1),"RIGHT"),
+            ("FONTSIZE",(0,0),(-1,0),6.5),
+            ("ALIGN",(0,1),(5,-1),"LEFT"),
+            ("ALIGN",(6,1),(-1,-1),"RIGHT"),
             ("FONTSIZE",(0,1),(-1,-1),8),
-            ("VALIGN",(0,0),(-1,-1),"MIDDLE")
+            ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+            ("LEFTPADDING",(0,0),(-1,-1),4),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("WORDWRAP",(0,0),(-1,0),"CJK")
         ])
         style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
         style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.lightgrey)
@@ -205,13 +231,13 @@ if agg_df is not None:
 
         # --- Amount in Words Row ---
         amount_words=amount_to_words(total_amount)
-        words_table=Table([[f"TOTAL  US DOLLAR {amount_words}"]],colWidths=[A4[0]-60])
+        words_table=Table([[f"TOTAL  US DOLLAR {amount_words}"]],colWidths=[content_width])
         words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                          ("FONTSIZE",(0,0),(-1,-1),8)]))
         elements.append(words_table)
 
         # --- Terms & Conditions ---
-        terms_table=Table([["Terms & Conditions (if any):"]],colWidths=[A4[0]-60])
+        terms_table=Table([["Terms & Conditions (if any):"]],colWidths=[content_width])
         terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                          ("FONTSIZE",(0,0),(-1,-1),8)]))
         elements.append(terms_table)
@@ -222,7 +248,7 @@ if agg_df is not None:
         sign_table=Table([
             [Image(sig_img,width=150,height=50),
              "Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)"]
-        ],colWidths=[0.5*A4[0],0.5*A4[0]])
+        ],colWidths=[0.5*content_width,0.5*content_width])
         sign_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                         ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
                                         ("ALIGN",(0,0),(0,0),"LEFT"),
@@ -230,7 +256,14 @@ if agg_df is not None:
                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
         elements.append(sign_table)
 
-        doc.build(elements)
+        # --- Outer Frame ---
+        outer_table = Table([[e] for e in elements], colWidths=[content_width])
+        outer_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),1.5,colors.black),  # Official stampy frame
+            ("VALIGN",(0,0),(-1,-1),"TOP")
+        ]))
+
+        doc.build([outer_table])
         with open(pdf_file,"rb") as f:
             st.download_button("⬇️ Download PI PDF", f, file_name="Proforma_Invoice.pdf")
         os.remove(pdf_file)
