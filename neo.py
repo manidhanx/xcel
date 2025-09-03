@@ -7,21 +7,41 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import tempfile
 import os
 from datetime import datetime
-import inflect
 
-# --- Number to words (USD) ---
+# --- Pure Python number to words (English) ---
+def number_to_words(n):
+    ones = ["","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE",
+            "TEN","ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN",
+            "SEVENTEEN","EIGHTEEN","NINETEEN"]
+    tens = ["","","TWENTY","THIRTY","FORTY","FIFTY","SIXTY","SEVENTY","EIGHTY","NINETY"]
+
+    def words(num):
+        if num < 20:
+            return ones[num]
+        elif num < 100:
+            return tens[num//10] + ("" if num%10==0 else " " + ones[num%10])
+        elif num < 1000:
+            return ones[num//100] + " HUNDRED" + ("" if num%100==0 else " " + words(num%100))
+        elif num < 1_000_000:
+            return words(num//1000) + " THOUSAND" + ("" if num%1000==0 else " " + words(num%1000))
+        elif num < 1_000_000_000:
+            return words(num//1_000_000) + " MILLION" + ("" if num%1_000_000==0 else " " + words(num%1_000_000))
+        else:
+            return str(num)
+
+    return words(n)
+
 def amount_to_words(amount):
-    p = inflect.engine()
     whole = int(amount)
     fraction = int(round((amount - whole) * 100))
-    words = p.number_to_words(whole, andword="").upper() + " DOLLARS"
+    words = number_to_words(whole) + " DOLLARS"
     if fraction > 0:
-        words += f" AND {p.number_to_words(fraction).upper()} CENTS"
+        words += f" AND {number_to_words(fraction)} CENTS"
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
 
-st.title("📑 Proforma Invoice Generator (v9 NoLib)")
+st.title("📑 Proforma Invoice Generator (v9 Pure)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -78,7 +98,7 @@ if uploaded_file:
             " ".join([str(x) for x in col if str(x) != "nan"]).strip()
             for col in df.columns.values
         ]
-        df = df.dropna(how="all")  # drop completely empty rows
+        df = df.dropna(how="all")
 
         # --- Detect columns ---
         style_col = next((col for col in df.columns if str(col).strip().lower().startswith("style")), None)
@@ -146,7 +166,6 @@ if uploaded_file:
             st.write("### Aggregated Data (Preview)")
             st.dataframe(agg_df)
 
-            # --- Generate PDF ---
             if st.button("Generate PI PDF"):
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
                     pdf_file = tmpfile.name
@@ -154,14 +173,12 @@ if uploaded_file:
                 doc = SimpleDocTemplate(
                     pdf_file,
                     pagesize=A4,
-                    leftMargin=30,
-                    rightMargin=30,
-                    topMargin=30,
-                    bottomMargin=30
+                    leftMargin=30, rightMargin=30,
+                    topMargin=30, bottomMargin=30
                 )
                 styles = getSampleStyleSheet()
                 normal = styles["Normal"]
-                bold = ParagraphStyle("bold", parent=styles["Normal"], fontName="Helvetica-Bold")
+                bold = ParagraphStyle("bold", parent=normal, fontName="Helvetica-Bold")
 
                 elements = []
 
@@ -186,7 +203,6 @@ if uploaded_file:
                 for _, row in agg_df.iterrows():
                     data.append(list(row))
 
-                # Add total row
                 total_qty = agg_df["QTY"].sum()
                 total_amount = agg_df["AMOUNT"].astype(float).sum()
                 data.append([
@@ -223,7 +239,7 @@ if uploaded_file:
                 elements.append(Paragraph(f"<b>In Words:</b> {amount_words}", normal))
                 elements.append(Spacer(1, 24))
 
-                # --- Signature block ---
+                # --- Signature ---
                 elements.append(Paragraph("For RNA Resources Group Ltd - Landmark (Babyshop)", normal))
                 elements.append(Spacer(1, 48))
                 elements.append(Paragraph("Authorised Signatory", normal))
