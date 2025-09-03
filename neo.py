@@ -4,13 +4,14 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
 import tempfile
 import os
 from datetime import datetime
 
 st.set_page_config(page_title="Excel Style Aggregator", layout="centered")
 
-st.title("👕 Excel → PDF (Style Aggregator - Fixed Qty v6)")
+st.title("👕 Excel → PDF (Style Aggregator - v7 Fit Table)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -182,7 +183,13 @@ if uploaded_file:
 
                 # --- Table Data ---
                 if len(agg_df) > 0:
-                    data = [agg_df.columns.tolist()]
+                    # Wrap headers if too long
+                    wrapped_headers = [
+                        Paragraph(col.replace(" ", "<br/>"), styles["Normal"]) if len(col) > 12 else Paragraph(col, styles["Normal"])
+                        for col in agg_df.columns
+                    ]
+
+                    data = [wrapped_headers]
                     for _, row in agg_df.iterrows():
                         formatted_row = []
                         for val in row:
@@ -192,12 +199,15 @@ if uploaded_file:
                                 formatted_row.append(str(val) if not pd.isna(val) else "")
                         data.append(formatted_row)
 
-                    table = Table(data)
+                    # Auto-fit columns to page width
+                    table = Table(data, colWidths=[A4[0] / len(agg_df.columns)] * len(agg_df.columns))
+
                     table.setStyle(TableStyle([
                         ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
                         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
                         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                        ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
                         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                         ("FONTSIZE", (0, 0), (-1, -1), 8),
                     ]))
