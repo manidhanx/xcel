@@ -275,7 +275,7 @@ if agg_df is not None:
 
         doc.build([outer_table])
 
-       # --- Standard 2-click download ---
+# --- Standard 2-click download ---
 with open(pdf_file, "rb") as f:
     st.download_button(
         "⬇️ Download Proforma Invoice",
