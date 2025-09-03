@@ -4,15 +4,24 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from num2words import num2words
 import tempfile
 import os
 from datetime import datetime
+import inflect
+
+# --- Number to words (USD) ---
+def amount_to_words(amount):
+    p = inflect.engine()
+    whole = int(amount)
+    fraction = int(round((amount - whole) * 100))
+    words = p.number_to_words(whole, andword="").upper() + " DOLLARS"
+    if fraction > 0:
+        words += f" AND {p.number_to_words(fraction).upper()} CENTS"
+    return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
 
-st.title("📑 Proforma Invoice Generator (v9 Final)")
+st.title("📑 Proforma Invoice Generator (v9 NoLib)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -209,7 +218,7 @@ if uploaded_file:
                 elements.append(Spacer(1, 12))
 
                 # --- Totals in words ---
-                amount_words = num2words(total_amount, to="currency", lang="en").upper()
+                amount_words = amount_to_words(total_amount)
                 elements.append(Paragraph(f"<b>Total Amount:</b> USD {total_amount:,.2f}", bold))
                 elements.append(Paragraph(f"<b>In Words:</b> {amount_words}", normal))
                 elements.append(Spacer(1, 24))
