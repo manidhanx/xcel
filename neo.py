@@ -18,7 +18,7 @@ def number_to_words(n):
         if num < 20: return ones[num]
         elif num < 100: return tens[num//10] + ("" if num%10==0 else " " + ones[num%10])
         elif num < 1000: return ones[num//100] + " HUNDRED" + ("" if num%100==0 else " " + words(num%100))
-        elif num < 1_000_000: return words(num//1000) + " THOUSAND" + ("" if num%1000==0 else " " + words(num%1000])
+        elif num < 1_000_000: return words(num//1000) + " THOUSAND" + ("" if num%1000==0 else " " + words(num%1000))
         elif num < 1_000_000_000: return words(num//1_000_000) + " MILLION" + ("" if num%1_000_000==0 else " " + words(num%1_000_000))
         else: return str(num)
     return words(n)
@@ -120,7 +120,8 @@ if uploaded_file:
 if agg_df is not None:
     st.write("### ✍️ Enter Invoice Details")
 
-    pi_no = st.text_input("PI No. & Date", "SAR/LG/0148 Dt. 14/10/2024")
+    today_str = datetime.today().strftime("%d/%m/%Y")
+    pi_no = st.text_input("PI No. & Date", f"SAR/LG/XXXX Dt. {today_str}")
     consignee_name = st.text_input("Consignee Name", "RNA Resource Group Ltd - Landmark (Babyshop)")
     consignee_addr = st.text_area("Consignee Address", "P.O Box 25030, Dubai, UAE")
     consignee_tel = st.text_input("Consignee Tel/Fax", "Tel: 00971 4 8095500, Fax: 00971 4 8095555/66")
