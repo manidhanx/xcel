@@ -166,10 +166,16 @@ if uploaded_file:
 
             # Show debug info
             st.write("### Debug Info")
-            st.write(f"Quantity Column Found: {qty_col}")
+            st.write(f"Quantity Column Index: {qty_col_idx}")
+            st.write(f"Quantity Column Name: {qty_col}")
             st.write(f"FOB Column Found: {fob_col}")
             st.write(f"Texture Found: {texture}")
             st.write(f"Country of Origin: {country_of_origin}")
+            
+            if qty_col_idx is not None:
+                st.write(f"Raw data at qty column index {qty_col_idx}:")
+                st.write(f"Row 7 (index 6): {raw_df.iloc[6, qty_col_idx] if qty_col_idx < len(raw_df.columns) else 'N/A'}")
+                st.write(f"Row 8 (index 7): {raw_df.iloc[7, qty_col_idx] if qty_col_idx < len(raw_df.columns) else 'N/A'}")
 
             # Generate PDF
             if st.button("Generate PDF"):
