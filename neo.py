@@ -10,7 +10,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="Excel Style Aggregator", layout="centered")
 
-st.title("👕 Excel → PDF (Style Aggregator - Fixed Qty v4)")
+st.title("👕 Excel → PDF (Style Aggregator - Fixed Qty v6)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -80,15 +80,17 @@ if uploaded_file:
                 style_col = col
                 break
 
-        # --- Robust Qty column detection ---
+        # --- Detect Qty column via "Value" ---
         qty_col = None
-        for col in df.columns:
-            col_clean = str(col).strip().lower()
-            if "total" in col_clean and "qty" in col_clean:
-                qty_col = col
+        value_col_index = None
+        for idx, col in enumerate(df.columns):
+            if "value" in str(col).lower():
+                value_col_index = idx
                 break
+        if value_col_index is not None and value_col_index > 0:
+            qty_col = df.columns[value_col_index - 1]
 
-        # --- Robust FOB detection ---
+        # --- FOB detection ---
         fob_col = None
         for col in df.columns:
             if "fob" in str(col).lower():
@@ -97,7 +99,7 @@ if uploaded_file:
 
         # Debug
         st.write("Detected Style column:", style_col)
-        st.write("Detected Qty column:", qty_col)
+        st.write("Detected Qty column (via Value):", qty_col)
         st.write("Detected FOB column:", fob_col)
         if qty_col:
             st.write("Sample Qty values:", df[qty_col].head(5).tolist())
