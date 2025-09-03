@@ -83,12 +83,14 @@ if uploaded_file:
                     if (str(df[col].iloc[6]).strip().lower() == "total" and 
                         str(df[col].iloc[7]).strip().lower() == "qty"):
                         qty_col = col
+                        qty_col_idx = df.columns.get_loc(col)
                         break
                 except:
                     continue
 
             # Find the FOB price column (contains "Fob$")
             fob_col = None
+            qty_col_idx = None
             for col in df.columns:
                 if "fob$" in str(col).lower():
                     fob_col = col
