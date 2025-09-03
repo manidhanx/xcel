@@ -275,14 +275,12 @@ if agg_df is not None:
 
         doc.build([outer_table])
 
-        # --- Auto download ---
-        with open(pdf_file, "rb") as f:
-            pdf_bytes = f.read()
-        b64 = base64.b64encode(pdf_bytes).decode()
-        href = f"""
-        <a id="autodl" href="data:application/pdf;base64,{b64}" download="Proforma_Invoice.pdf"></a>
-        <script>document.getElementById('autodl').click();</script>
-        """
-        st.markdown(href, unsafe_allow_html=True)
-
-        os.remove(pdf_file)
+       # --- Standard 2-click download ---
+with open(pdf_file, "rb") as f:
+    st.download_button(
+        "⬇️ Download Proforma Invoice",
+        f,
+        file_name="Proforma_Invoice.pdf",
+        mime="application/pdf"
+    )
+os.remove(pdf_file)
