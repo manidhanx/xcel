@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
-from reportlab.platypus import (
-    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-)
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -20,7 +18,7 @@ def number_to_words(n):
         if num < 20: return ones[num]
         elif num < 100: return tens[num//10] + ("" if num%10==0 else " " + ones[num%10])
         elif num < 1000: return ones[num//100] + " HUNDRED" + ("" if num%100==0 else " " + words(num%100))
-        elif num < 1_000_000: return words(num//1000) + " THOUSAND" + ("" if num%1000==0 else " " + words(num%1000))
+        elif num < 1_000_000: return words(num//1000) + " THOUSAND" + ("" if num%1000==0 else " " + words(num%1000])
         elif num < 1_000_000_000: return words(num//1_000_000) + " MILLION" + ("" if num%1_000_000==0 else " " + words(num%1_000_000))
         else: return str(num)
     return words(n)
@@ -34,29 +32,24 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v10 Pure)")
+st.title("📑 Proforma Invoice Generator (v11 Pure)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
+
+agg_df, order_no, made_in, loading_port, ship_date, order_of, texture, country_of_origin = [None]*8
 
 if uploaded_file:
     raw_df = pd.read_excel(uploaded_file, header=None)
 
-    # --- Extract header info ---
-    buyer_name = "LANDMARK GROUP"
-    order_no, brand, made_in, loading_port, ship_date, order_of = [None]*6
-    texture, country_of_origin = None, None
-
+    # --- Extract shipment info ---
     for i, row in raw_df.iterrows():
         for j, cell in enumerate(row):
             cell_val = str(cell).strip().lower()
             if cell_val == "order no :":
                 try: order_no = row[j+2]
                 except: pass
-            elif cell_val == "brand :":
-                try: brand = row[j+1]
-                except: pass
             elif cell_val == "made in country :":
-                try:
+                try: 
                     made_in = row[j+1]
                     country_of_origin = row[j+1]
                 except: pass
@@ -73,7 +66,7 @@ if uploaded_file:
                 try: texture = row[j+1]
                 except: pass
 
-    # --- Detect header row ---
+    # --- Find header row ---
     header_row_idx = None
     for i, row in raw_df.iterrows():
         if row.astype(str).str.strip().str.lower().eq("style").any():
@@ -87,7 +80,7 @@ if uploaded_file:
         df.columns = [" ".join([str(x) for x in col if str(x)!="nan"]).strip() for col in df.columns.values]
         df = df.dropna(how="all")
 
-        # --- Detect key cols ---
+        # --- Detect columns ---
         style_col = next((c for c in df.columns if str(c).strip().lower().startswith("style")), None)
         qty_col, value_col_index = None, None
         for idx, col in enumerate(df.columns):
@@ -100,131 +93,143 @@ if uploaded_file:
         if not style_col or not qty_col:
             st.error("❌ Could not detect Qty/Style column.")
         else:
-            aggregated_data = []
+            # --- Aggregate ---
+            aggregated_data=[]
             for style in df[style_col].dropna().unique():
-                rows = df[df[style_col]==style]
+                rows=df[df[style_col]==style]
                 if len(rows)>0:
-                    r = rows.iloc[0]
-                    desc = r.iloc[1] if len(r)>1 else ""
-                    comp = r.iloc[2] if len(r)>2 else ""
-                    total_qty = pd.to_numeric(rows[qty_col], errors='coerce').fillna(0).sum()
-                    unit_price = 0
+                    r=rows.iloc[0]
+                    desc=r.iloc[1] if len(r)>1 else ""
+                    comp=r.iloc[2] if len(r)>2 else ""
+                    total_qty=pd.to_numeric(rows[qty_col],errors='coerce').fillna(0).sum()
+                    unit_price=0
                     if fob_col and fob_col in rows.columns:
-                        prices = pd.to_numeric(rows[fob_col], errors='coerce').fillna(0)
-                        nz = prices[prices>0]
-                        unit_price = nz.iloc[0] if len(nz)>0 else 0
-                    amount = total_qty*unit_price
-                    aggregated_data.append([style, desc, texture or "Knitted", "61112000", comp, country_of_origin or "India",
-                                            int(total_qty), f"{unit_price:.2f}", f"{amount:.2f}"])
-
-            agg_df = pd.DataFrame(aggregated_data, columns=[
-                "STYLE NO.","ITEM DESCRIPTION","FABRIC TYPE","H.S NO","COMPOSITION","ORIGIN",
-                "QTY","FOB","AMOUNT"
+                        prices=pd.to_numeric(rows[fob_col],errors='coerce').fillna(0)
+                        nz=prices[prices>0]
+                        unit_price=nz.iloc[0] if len(nz)>0 else 0
+                    amount=total_qty*unit_price
+                    aggregated_data.append([style,desc,texture or "Knitted","61112000",comp,
+                        country_of_origin or "India",int(total_qty),f"{unit_price:.2f}",f"{amount:.2f}"])
+            agg_df=pd.DataFrame(aggregated_data,columns=[
+                "STYLE NO.","ITEM DESCRIPTION","FABRIC TYPE","H.S NO","COMPOSITION","ORIGIN","QTY","FOB","AMOUNT"
             ])
+            st.write("### ✅ Parsed Order Data")
             st.dataframe(agg_df)
 
-            if st.button("Generate PI PDF"):
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                    pdf_file = tmp.name
+# --- Only show inputs if parsing succeeded ---
+if agg_df is not None:
+    st.write("### ✍️ Enter Invoice Details")
 
-                doc = SimpleDocTemplate(pdf_file, pagesize=A4, leftMargin=30, rightMargin=30, topMargin=30, bottomMargin=30)
-                styles = getSampleStyleSheet()
-                normal = styles["Normal"]
-                bold = ParagraphStyle("bold", parent=normal, fontName="Helvetica-Bold")
+    pi_no = st.text_input("PI No. & Date", "SAR/LG/0148 Dt. 14/10/2024")
+    consignee_name = st.text_input("Consignee Name", "RNA Resource Group Ltd - Landmark (Babyshop)")
+    consignee_addr = st.text_area("Consignee Address", "P.O Box 25030, Dubai, UAE")
+    consignee_tel = st.text_input("Consignee Tel/Fax", "Tel: 00971 4 8095500, Fax: 00971 4 8095555/66")
+    buyer_name = st.text_input("Buyer Name", "LANDMARK GROUP")
+    brand_name = st.text_input("Brand Name", "Juniors")
+    payment_term = st.text_input("Payment Term", "T/T")
 
-                elements=[]
+    if st.button("Generate Proforma Invoice"):
+        with tempfile.NamedTemporaryFile(delete=False,suffix=".pdf") as tmp:
+            pdf_file=tmp.name
 
-                # --- Title ---
-                elements.append(Paragraph("<b><font size=14>PROFORMA INVOICE</font></b>", ParagraphStyle("center", alignment=1)))
-                elements.append(Spacer(1,12))
+        doc=SimpleDocTemplate(pdf_file,pagesize=A4,leftMargin=30,rightMargin=30,topMargin=30,bottomMargin=30)
+        styles=getSampleStyleSheet()
+        normal=styles["Normal"]
+        bold=ParagraphStyle("bold",parent=normal,fontName="Helvetica-Bold")
 
-                # --- Supplier details ---
-                supplier = [
-                    "<b>Supplier Name:</b> SAR APPARELS INDIA PVT.LTD.",
-                    "Address: 6, Picaso Bithi, Kolkata - 700017",
-                    "Phone: 9817473373",
-                    "Fax: N.A."
-                ]
-                for line in supplier: elements.append(Paragraph(line, normal))
-                elements.append(Spacer(1,12))
+        elements=[]
 
-                # --- Consignee ---
-                consignee = [
-                    "<b>Consignee:</b>",
-                    "RNA Resource Group Ltd - Landmark (Babyshop)",
-                    "P.O Box 25030, Dubai, UAE",
-                    "Tel: 00971 4 8095500, Fax: 00971 4 8095555/66"
-                ]
-                for line in consignee: elements.append(Paragraph(line, normal))
-                elements.append(Spacer(1,12))
+        # --- Title ---
+        elements.append(Paragraph("<b><font size=14>PROFORMA INVOICE</font></b>",ParagraphStyle("center",alignment=1)))
+        elements.append(Spacer(1,12))
 
-                # --- Order details ---
-                today = datetime.today().strftime("%d-%m-%Y")
-                order_info=[
-                    f"<b>Landmark Order Ref:</b> {order_no}",
-                    f"<b>Buyer Name:</b> {buyer_name}",
-                    f"<b>Brand:</b> {brand}",
-                    f"<b>Loading Country:</b> {made_in}",
-                    f"<b>Port of Loading:</b> {loading_port}",
-                    f"<b>Agreed Shipment Date:</b> {ship_date}",
-                    f"<b>Description of Goods:</b> {order_of}",
-                    f"<b>Report Date:</b> {today}"
-                ]
-                for line in order_info: elements.append(Paragraph(line, normal))
-                elements.append(Spacer(1,12))
+        # --- Supplier & Consignee Block ---
+        sup=[
+            ["<b>Supplier Name:</b> SAR APPARELS INDIA PVT.LTD.",pi_no],
+            ["Address: 6, Picaso Bithi, Kolkata - 700017","<b>Landmark order Reference:</b> "+str(order_no)],
+            ["Phone: 9817473373","<b>Buyer Name:</b> "+buyer_name],
+            ["Fax: N.A.","<b>Brand Name:</b> "+brand_name],
+        ]
+        con=[
+            ["<b>Consignee:</b>",payment_term],
+            [consignee_name,"<b>Bank Details (Including Swift/IBAN):</b>"],
+            [consignee_addr,"Beneficiary: SAR APPARELS INDIA PVT.LTD"],
+            [consignee_tel,"Account No: 2112819952"],
+            ["","Bank: Kotak Mahindra Bank Ltd"],
+            ["","Address: 2 Brabourne Road, Govind Bhavan, Ground Floor, Kolkata - 700001"],
+            ["","SWIFT: KKBKINBBCPC"],
+            ["","Bank Code: 0323"],
+        ]
+        info_table=Table(sup+con,colWidths=[0.5*A4[0],0.5*A4[0]])
+        info_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
+                                        ("VALIGN",(0,0),(-1,-1),"TOP"),
+                                        ("FONTSIZE",(0,0),(-1,-1),8)]))
+        elements.append(info_table)
+        elements.append(Spacer(1,12))
 
-                # --- Bank details ---
-                bank=[
-                    "<b>Bank Details (Including Swift/IBAN):</b>",
-                    "Beneficiary: SAR APPARELS INDIA PVT.LTD",
-                    "Account No: 2112819952",
-                    "Bank: Kotak Mahindra Bank Ltd",
-                    "Address: 2 Brabourne Road, Govind Bhavan, Ground Floor, Kolkata - 700001",
-                    "SWIFT: KKBKINBBCPC",
-                    "Bank Code: 0323"
-                ]
-                for line in bank: elements.append(Paragraph(line, normal))
-                elements.append(Spacer(1,12))
+        # --- Shipment Info ---
+        ship=[
+            ["<b>Loading Country:</b> "+str(made_in),"<b>Port of Loading:</b> "+str(loading_port)],
+            ["<b>Agreed Shipment Date:</b> "+str(ship_date),"<b>Description of goods:</b> "+str(order_of)]
+        ]
+        ship_table=Table(ship,colWidths=[0.5*A4[0],0.5*A4[0]])
+        ship_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
+                                        ("FONTSIZE",(0,0),(-1,-1),8)]))
+        elements.append(ship_table)
+        elements.append(Spacer(1,12))
 
-                # --- Table ---
-                data=[list(agg_df.columns)]
-                for _,row in agg_df.iterrows(): data.append(list(row))
-                total_qty=agg_df["QTY"].sum()
-                total_amount=agg_df["AMOUNT"].astype(float).sum()
-                data.append(["TOTAL","","","","","",f"{int(total_qty):,}","",f"{total_amount:,.2f}"])
+        # --- Main Items Table ---
+        data=[list(agg_df.columns)]
+        for _,row in agg_df.iterrows(): data.append(list(row))
+        total_qty=agg_df["QTY"].sum()
+        total_amount=agg_df["AMOUNT"].astype(float).sum()
+        data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
+        col_widths=[0.12*A4[0],0.25*A4[0],0.10*A4[0],0.10*A4[0],0.20*A4[0],0.08*A4[0],0.05*A4[0],0.05*A4[0],0.05*A4[0]]
+        table=Table(data,colWidths=col_widths,repeatRows=1)
+        style=TableStyle([
+            ("GRID",(0,0),(-1,-1),0.25,colors.black),
+            ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#333333")),
+            ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
+            ("ALIGN",(0,0),(-1,0),"CENTER"),
+            ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+            ("FONTSIZE",(0,0),(-1,0),7),
+            ("ALIGN",(-3,1),(-1,-1),"RIGHT"),
+            ("FONTSIZE",(0,1),(-1,-1),8),
+            ("VALIGN",(0,0),(-1,-1),"MIDDLE")
+        ])
+        style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
+        style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.lightgrey)
+        table.setStyle(style)
+        elements.append(table)
 
-                col_widths=[0.12*A4[0],0.25*A4[0],0.10*A4[0],0.10*A4[0],0.20*A4[0],0.08*A4[0],0.05*A4[0],0.05*A4[0],0.05*A4[0]]
-                table=Table(data,colWidths=col_widths,repeatRows=1)
-                style=TableStyle([
-                    ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#333333")),
-                    ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
-                    ("ALIGN",(0,0),(-1,0),"CENTER"),
-                    ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-                    ("FONTSIZE",(0,0),(-1,0),7),
-                    ("GRID",(0,0),(-1,-1),0.25,colors.black),
-                    ("ALIGN",(-3,1),(-1,-1),"RIGHT"),
-                    ("FONTSIZE",(0,1),(-1,-1),8),
-                    ("VALIGN",(0,0),(-1,-1),"MIDDLE")
-                ])
-                style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
-                style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.lightgrey)
-                table.setStyle(style)
-                elements.append(table)
-                elements.append(Spacer(1,12))
+        # --- Amount in Words Row ---
+        amount_words=amount_to_words(total_amount)
+        words_table=Table([[f"TOTAL  US DOLLAR {amount_words}"]],colWidths=[A4[0]-60])
+        words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
+                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
+        elements.append(words_table)
 
-                # --- Totals ---
-                amount_words=amount_to_words(total_amount)
-                elements.append(Paragraph(f"<b>Total Amount:</b> USD {total_amount:,.2f}", bold))
-                elements.append(Paragraph(f"<b>In Words:</b> {amount_words}", normal))
-                elements.append(Spacer(1,24))
+        # --- Terms & Conditions ---
+        terms_table=Table([["Terms & Conditions (if any):"]],colWidths=[A4[0]-60])
+        terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
+                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
+        elements.append(terms_table)
+        elements.append(Spacer(1,24))
 
-                # --- Signature ---
-                elements.append(Paragraph("For RNA Resources Group Ltd - Landmark (Babyshop)", normal))
-                elements.append(Spacer(1,36))
-                elements.append(Paragraph("-------------------------------------", normal))
-                elements.append(Paragraph("Authorised Signatory", normal))
+        # --- Signature ---
+        sig_img = "sarsign.png"  # constant image stored alongside script
+        sign_table=Table([
+            [Image(sig_img,width=150,height=50),
+             "Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)"]
+        ],colWidths=[0.5*A4[0],0.5*A4[0]])
+        sign_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
+                                        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+                                        ("ALIGN",(0,0),(0,0),"LEFT"),
+                                        ("ALIGN",(1,0),(1,0),"RIGHT"),
+                                        ("FONTSIZE",(0,0),(-1,-1),8)]))
+        elements.append(sign_table)
 
-                doc.build(elements)
-                with open(pdf_file,"rb") as f:
-                    st.download_button("⬇️ Download PI PDF", f, file_name="Proforma_Invoice.pdf")
-                os.remove(pdf_file)
+        doc.build(elements)
+        with open(pdf_file,"rb") as f:
+            st.download_button("⬇️ Download PI PDF", f, file_name="Proforma_Invoice.pdf")
+        os.remove(pdf_file)
