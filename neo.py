@@ -73,34 +73,34 @@ if uploaded_file:
         st.dataframe(df.head())
 
         # --- Robust Style column detection ---
-        style_col = None
-        for col in df.columns:
-            if "style" in str(col).lower():
-                style_col = col
-                break
+       style_col = None
+for col in df.columns:
+    col_clean = str(col).strip().lower()
+    if col_clean.startswith("style"):
+        style_col = col
+        break
 
-        if not style_col:
-            st.error("❌ Could not find a Style column in the file.")
-        else:
-            # --- Robust Qty column detection ---
-            qty_col = None
-            for col in df.columns:
-                col_clean = str(col).strip().lower().replace("  ", " ")
-                if "total" in col_clean and "qty" in col_clean:
-                    qty_col = col
-                    break
+# --- Robust Qty column detection ---
+qty_col = None
+for col in df.columns:
+    col_clean = str(col).strip().lower()
+    if "total" in col_clean and "qty" in col_clean:
+        qty_col = col
+        break
 
-            # --- FOB detection ---
-            fob_col = None
-            for col in df.columns:
-                if "fob" in str(col).lower():
-                    fob_col = col
-                    break
+# --- Robust FOB detection ---
+fob_col = None
+for col in df.columns:
+    if "fob" in str(col).lower():
+        fob_col = col
+        break
 
-            # Debug prints
-            st.write("Detected Style column:", style_col)
-            st.write("Detected Qty column:", qty_col)
-            st.write("Detected FOB column:", fob_col)
+# Debug
+st.write("Detected Style column:", style_col)
+st.write("Detected Qty column:", qty_col)
+st.write("Detected FOB column:", fob_col)
+if qty_col:
+    st.write("Sample Qty values:", df[qty_col].head(5).tolist())
 
             # Build aggregated data
             aggregated_data = []
