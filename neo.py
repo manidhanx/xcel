@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v11.7 Pure)")
+st.title("📑 Proforma Invoice Generator (v11.8 Pure)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -141,9 +141,10 @@ if agg_df is not None:
         styles=getSampleStyleSheet()
         normal=styles["Normal"]
         bold=ParagraphStyle("bold",parent=normal,fontName="Helvetica-Bold")
+        small_bold=ParagraphStyle("small_bold",parent=normal,fontName="Helvetica-Bold",fontSize=8)
 
         elements=[]
-        content_width = A4[0] - 110   # tighter fit
+        content_width = A4[0] - 110
         inner_width = content_width - 6
         table_width = inner_width - 6
 
@@ -166,7 +167,7 @@ if agg_df is not None:
 
         # --- Supplier & Consignee ---
         sup=[
-            [Paragraph("<b>Supplier Name:</b> SAR APPARELS INDIA PVT.LTD.", normal), Paragraph(pi_no, normal)],
+            [Paragraph("Supplier Name: SAR APPARELS INDIA PVT.LTD.", small_bold), Paragraph(pi_no, normal)],
             [Paragraph("Address: 6, Picaso Bithi, Kolkata - 700017", normal), Paragraph("<b>Landmark order Reference:</b> "+str(order_no), normal)],
             [Paragraph("Phone: 9817473373", normal), Paragraph("<b>Buyer Name:</b> "+buyer_name, normal)],
             [Paragraph("Fax: N.A.", normal), Paragraph("<b>Brand Name:</b> "+brand_name, normal)],
