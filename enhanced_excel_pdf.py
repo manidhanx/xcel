@@ -128,14 +128,15 @@ if uploaded_file:
                     # Calculate aggregated quantity
                     total_qty = 0
                     if qty_col and qty_col in style_rows.columns:
-                        total_qty = pd.to_numeric(style_rows[qty_col], errors='coerce').sum()
+                        qty_values = pd.to_numeric(style_rows[qty_col], errors='coerce').fillna(0)
+                        total_qty = qty_values.sum()
                     
-                    # Get unit price (FOB)
+                    # Get unit price (FOB) - take the first non-zero value
                     unit_price = 0
                     if fob_col and fob_col in style_rows.columns:
-                        # Take the first non-zero price for this style
-                        prices = pd.to_numeric(style_rows[fob_col], errors='coerce').dropna()
-                        unit_price = prices.iloc[0] if len(prices) > 0 else 0
+                        price_values = pd.to_numeric(style_rows[fob_col], errors='coerce').fillna(0)
+                        non_zero_prices = price_values[price_values > 0]
+                        unit_price = non_zero_prices.iloc[0] if len(non_zero_prices) > 0 else 0
                     
                     # Calculate amount
                     amount = total_qty * unit_price
