@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v11.8 Pure)")
+st.title("🚀 Futuristic Proforma Invoice Generator (v12.0 God Mode)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -66,7 +66,6 @@ if uploaded_file:
                 try: texture = row[j+1]
                 except: pass
 
-    # Clean shipment date if datetime
     if isinstance(ship_date, (datetime, pd.Timestamp)):
         ship_date = ship_date.strftime("%d/%m/%Y")
 
@@ -120,10 +119,9 @@ if uploaded_file:
             st.write("### ✅ Parsed Order Data")
             st.dataframe(agg_df)
 
-# --- Only show inputs if parsing succeeded ---
+# --- Inputs ---
 if agg_df is not None:
     st.write("### ✍️ Enter Invoice Details")
-
     today_str = datetime.today().strftime("%d/%m/%Y")
     pi_no = st.text_input("PI No. & Date", f"SAR/LG/XXXX Dt. {today_str}")
     consignee_name = st.text_input("Consignee Name", "RNA Resource Group Ltd - Landmark (Babyshop)")
@@ -140,7 +138,7 @@ if agg_df is not None:
         doc=SimpleDocTemplate(pdf_file,pagesize=A4,leftMargin=30,rightMargin=30,topMargin=30,bottomMargin=30)
         styles=getSampleStyleSheet()
         normal=styles["Normal"]
-        bold=ParagraphStyle("bold",parent=normal,fontName="Helvetica-Bold")
+        bold=ParagraphStyle("bold",parent=normal,fontName="Helvetica-Bold",fontSize=10)
         small_bold=ParagraphStyle("small_bold",parent=normal,fontName="Helvetica-Bold",fontSize=8)
 
         elements=[]
@@ -148,24 +146,24 @@ if agg_df is not None:
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # --- Header with logo ---
+        # --- Header with futuristic panel ---
         logo = Image("sarlogo.jpg", width=100, height=55)
         title_table = Table([
-            [Paragraph("<font size=20><b>PROFORMA INVOICE</b></font>", bold), logo]
+            [Paragraph("<font size=22 color='#ecf0f1'><b>PROFORMA INVOICE</b></font>", bold), logo]
         ], colWidths=[0.75*inner_width, 0.25*inner_width])
         title_table.setStyle(TableStyle([
-            ("GRID",(0,0),(-1,-1),0.75,colors.black),
-            ("ALIGN",(0,0),(0,0),"CENTER"),
+            ("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#95a5a6")),
+            ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#2c3e50")),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+            ("ALIGN",(0,0),(0,0),"CENTER"),
             ("ALIGN",(1,0),(1,0),"RIGHT"),
-            ("FONTSIZE",(0,0),(-1,-1),20),
-            ("TOPPADDING",(0,0),(-1,-1),8),
-            ("BOTTOMPADDING",(0,0),(-1,-1),8),
+            ("TOPPADDING",(0,0),(-1,-1),10),
+            ("BOTTOMPADDING",(0,0),(-1,-1),10),
         ]))
         elements.append(title_table)
         elements.append(Spacer(1,12))
 
-        # --- Supplier & Consignee ---
+        # --- Supplier & Consignee futuristic box ---
         sup=[
             [Paragraph("Supplier Name: SAR APPARELS INDIA PVT.LTD.", small_bold), Paragraph(pi_no, normal)],
             [Paragraph("Address: 6, Picaso Bithi, Kolkata - 700017", normal), Paragraph("<b>Landmark order Reference:</b> "+str(order_no), normal)],
@@ -183,24 +181,38 @@ if agg_df is not None:
             ["", Paragraph("Bank Code: 0323", normal)],
         ]
         info_table=Table(sup+con,colWidths=[0.5*inner_width,0.5*inner_width])
-        info_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                        ("VALIGN",(0,0),(-1,-1),"TOP"),
-                                        ("FONTSIZE",(0,0),(-1,-1),8)]))
+        info_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#bdc3c7")),
+            ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#ffffff")),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("FONTSIZE",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),6),
+            ("RIGHTPADDING",(0,0),(-1,-1),6),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
         elements.append(info_table)
         elements.append(Spacer(1,12))
 
-        # --- Shipment Info ---
+        # --- Shipment Info futuristic box ---
         ship=[
             [Paragraph("<b>Loading Country:</b> "+str(made_in), normal), Paragraph("<b>Port of Loading:</b> "+str(loading_port), normal)],
             [Paragraph("<b>Agreed Shipment Date:</b> "+str(ship_date), normal), Paragraph("<b>Description of goods:</b> "+str(order_of), normal)]
         ]
         ship_table=Table(ship,colWidths=[0.5*inner_width,0.5*inner_width])
-        ship_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                        ("FONTSIZE",(0,0),(-1,-1),8)]))
+        ship_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#bdc3c7")),
+            ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#ffffff")),
+            ("FONTSIZE",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),6),
+            ("RIGHTPADDING",(0,0),(-1,-1),6),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
         elements.append(ship_table)
         elements.append(Spacer(1,12))
 
-        # --- Main Items Table ---
+        # --- Main Items Table futuristic style ---
         data=[list(agg_df.columns)]
         for _,row in agg_df.iterrows(): data.append(list(row))
         total_qty=agg_df["QTY"].sum()
@@ -221,65 +233,96 @@ if agg_df is not None:
 
         table=Table(data,colWidths=col_widths,repeatRows=1)
         style=TableStyle([
-            ("GRID",(0,0),(-1,-1),0.25,colors.black),
-            ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#333333")),
+            ("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#bdc3c7")),
+            ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#2c3e50")),
             ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
             ("ALIGN",(0,0),(-1,0),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-            ("FONTSIZE",(0,0),(-1,0),6.5),
+            ("FONTSIZE",(0,0),(-1,0),7.5),
+
+            ("BACKGROUND",(0,1),(-1,-2),colors.HexColor("#ffffff")),
+            ("ROWBACKGROUNDS",(0,1),(-1,-2),[colors.HexColor("#ffffff"),colors.HexColor("#f9f9f9")]),
+
             ("ALIGN",(0,1),(5,-1),"CENTER"),
             ("ALIGN",(6,1),(-1,-1),"RIGHT"),
             ("FONTSIZE",(0,1),(-1,-1),8),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ("LEFTPADDING",(0,0),(-1,-1),4),
-            ("RIGHTPADDING",(0,0),(-1,-1),4),
-            ("WORDWRAP",(0,0),(-1,0),"CJK")
+
+            ("LEFTPADDING",(0,0),(-1,-1),6),
+            ("RIGHTPADDING",(0,0),(-1,-1),6),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+
+            ("BACKGROUND",(0,-1),(-1,-1),colors.HexColor("#ecf0f1")),
+            ("FONTNAME",(0,-1),(-1,-1),"Helvetica-Bold"),
+            ("TEXTCOLOR",(0,-1),(-1,-1),colors.HexColor("#2c3e50")),
+            ("FONTSIZE",(0,-1),(-1,-1),9)
         ])
-        style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
-        style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.lightgrey)
         table.setStyle(style)
         elements.append(table)
 
-        # --- Amount in Words ---
+        # --- Amount in Words box ---
         amount_words=amount_to_words(total_amount)
-        words_table=Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]],colWidths=[inner_width])
-        words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
+        words_table=Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", bold)]],colWidths=[inner_width])
+        words_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#bdc3c7")),
+            ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#ffffff")),
+            ("FONTSIZE",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),6),
+            ("RIGHTPADDING",(0,0),(-1,-1),6),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
         elements.append(words_table)
 
-        # --- Terms & Conditions ---
+        # --- Terms & Conditions box ---
         terms_table=Table([[Paragraph("Terms & Conditions (if any):", normal)]],colWidths=[inner_width])
-        terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
+        terms_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#bdc3c7")),
+            ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#ffffff")),
+            ("FONTSIZE",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),6),
+            ("RIGHTPADDING",(0,0),(-1,-1),6),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
         elements.append(terms_table)
         elements.append(Spacer(1,24))
 
-        # --- Signature ---
+        # --- Signature futuristic box ---
         sig_img = "sarsign.png"
         sign_table=Table([
             [Image(sig_img,width=150,height=50),
              Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]
         ],colWidths=[0.5*inner_width,0.5*inner_width])
-        sign_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-                                        ("ALIGN",(0,0),(0,0),"LEFT"),
-                                        ("ALIGN",(1,0),(1,0),"RIGHT"),
-                                        ("FONTSIZE",(0,0),(-1,-1),8)]))
+        sign_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),0.25,colors.HexColor("#bdc3c7")),
+            ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#ffffff")),
+            ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+            ("ALIGN",(0,0),(0,0),"LEFT"),
+            ("ALIGN",(1,0),(1,0),"RIGHT"),
+            ("FONTSIZE",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),6),
+            ("RIGHTPADDING",(0,0),(-1,-1),6),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
         elements.append(sign_table)
 
         # --- Outer Frame ---
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
         outer_table.setStyle(TableStyle([
-            ("GRID",(0,0),(-1,-1),1.5,colors.black),
-            ("VALIGN",(0,0),(-1,-1),"TOP")
+            ("GRID",(0,0),(-1,-1),1.5,colors.HexColor("#7f8c8d")),
+            ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#ecf0f1")),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
         ]))
 
         doc.build([outer_table])
 
-        # --- Standard 2-click download ---
+        # --- Download Button ---
         with open(pdf_file, "rb") as f:
             st.download_button(
-                "⬇️ Download Proforma Invoice",
+                "⬇️ Download Futuristic Proforma Invoice",
                 f,
                 file_name="Proforma_Invoice.pdf",
                 mime="application/pdf"
