@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v11.3 Pure)")
+st.title("📑 Proforma Invoice Generator (v11.4 Pure)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -65,6 +65,10 @@ if uploaded_file:
             elif cell_val == "texture :":
                 try: texture = row[j+1]
                 except: pass
+
+    # Clean shipment date if datetime
+    if isinstance(ship_date, (datetime, pd.Timestamp)):
+        ship_date = ship_date.strftime("%d/%m/%Y")
 
     # --- Find header row ---
     header_row_idx = None
@@ -141,12 +145,17 @@ if agg_df is not None:
         elements=[]
         content_width = A4[0] - 100
         inner_width = content_width - 6
+        table_width = inner_width - 6
 
-        # --- Title ---
-        title_table = Table([[Paragraph("PROFORMA INVOICE", bold)]], colWidths=[inner_width])
+        # --- Header with logo ---
+        logo = Image("sarlogo.jpg", width=120, height=70)
+        title_table = Table([
+            [Paragraph("PROFORMA INVOICE", bold), logo]
+        ], colWidths=[0.7*inner_width, 0.3*inner_width])
         title_table.setStyle(TableStyle([
             ("GRID",(0,0),(-1,-1),0.75,colors.black),
-            ("ALIGN",(0,0),(-1,-1),"CENTER"),
+            ("ALIGN",(0,0),(0,0),"CENTER"),
+            ("ALIGN",(1,0),(1,0),"RIGHT"),
             ("FONTSIZE",(0,0),(-1,-1),14),
             ("TOPPADDING",(0,0),(-1,-1),8),
             ("BOTTOMPADDING",(0,0),(-1,-1),8),
@@ -154,7 +163,7 @@ if agg_df is not None:
         elements.append(title_table)
         elements.append(Spacer(1,12))
 
-        # --- Supplier & Consignee Block (with Paragraphs) ---
+        # --- Supplier & Consignee ---
         sup=[
             [Paragraph("<b>Supplier Name:</b> SAR APPARELS INDIA PVT.LTD.", normal), Paragraph(pi_no, normal)],
             [Paragraph("Address: 6, Picaso Bithi, Kolkata - 700017", normal), Paragraph("<b>Landmark order Reference:</b> "+str(order_no), normal)],
@@ -197,15 +206,15 @@ if agg_df is not None:
         data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
 
         col_widths = [
-            inner_width * 0.10,  # STYLE NO
-            inner_width * 0.25,  # ITEM DESCRIPTION
-            inner_width * 0.09,  # FABRIC TYPE
-            inner_width * 0.10,  # H.S NO
-            inner_width * 0.15,  # COMPOSITION
-            inner_width * 0.08,  # ORIGIN
-            inner_width * 0.07,  # QTY
-            inner_width * 0.075, # FOB
-            inner_width * 0.095  # AMOUNT
+            table_width * 0.10,  # STYLE NO
+            table_width * 0.23,  # ITEM DESCRIPTION
+            table_width * 0.12,  # FABRIC TYPE
+            table_width * 0.10,  # H.S NO
+            table_width * 0.15,  # COMPOSITION
+            table_width * 0.08,  # ORIGIN
+            table_width * 0.07,  # QTY
+            table_width * 0.075, # FOB
+            table_width * 0.095  # AMOUNT
         ]
 
         table=Table(data,colWidths=col_widths,repeatRows=1)
