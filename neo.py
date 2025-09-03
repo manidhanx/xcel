@@ -4,14 +4,13 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import inch
 import tempfile
 import os
 from datetime import datetime
 
 st.set_page_config(page_title="Excel Style Aggregator", layout="centered")
 
-st.title("👕 Excel → PDF (Style Aggregator - v7 Fit Table)")
+st.title("👕 Excel → PDF (Style Aggregator - v8 Pro Table)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -159,7 +158,14 @@ if uploaded_file:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
                     pdf_file = tmpfile.name
 
-                doc = SimpleDocTemplate(pdf_file, pagesize=A4)
+                doc = SimpleDocTemplate(
+                    pdf_file,
+                    pagesize=A4,
+                    leftMargin=30,
+                    rightMargin=30,
+                    topMargin=30,
+                    bottomMargin=30
+                )
                 styles = getSampleStyleSheet()
                 elements = []
 
@@ -183,7 +189,6 @@ if uploaded_file:
 
                 # --- Table Data ---
                 if len(agg_df) > 0:
-                    # Wrap headers if too long
                     wrapped_headers = [
                         Paragraph(col.replace(" ", "<br/>"), styles["Normal"]) if len(col) > 12 else Paragraph(col, styles["Normal"])
                         for col in agg_df.columns
@@ -192,26 +197,50 @@ if uploaded_file:
                     data = [wrapped_headers]
                     for _, row in agg_df.iterrows():
                         formatted_row = []
-                        for val in row:
+                        for idx, val in enumerate(row):
                             if isinstance(val, (int, float)) and not pd.isna(val):
-                                formatted_row.append(f"{val:.2f}" if val % 1 != 0 else f"{int(val)}")
+                                formatted_row.append(f"{val:,.0f}")  # commas for readability
                             else:
                                 formatted_row.append(str(val) if not pd.isna(val) else "")
                         data.append(formatted_row)
 
-                    # Auto-fit columns to page width
-                    table = Table(data, colWidths=[A4[0] / len(agg_df.columns)] * len(agg_df.columns))
+                    # Custom column widths (approx distribution of A4 width)
+                    col_widths = [
+                        0.12 * A4[0],  # Style
+                        0.25 * A4[0],  # Item Desc
+                        0.10 * A4[0],  # Fabric
+                        0.10 * A4[0],  # HS No
+                        0.20 * A4[0],  # Composition
+                        0.08 * A4[0],  # Country
+                        0.05 * A4[0],  # Qty
+                        0.05 * A4[0],  # FOB
+                        0.05 * A4[0],  # Amount
+                    ]
 
-                    table.setStyle(TableStyle([
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                    table = Table(data, colWidths=col_widths, repeatRows=1)
+
+                    style = TableStyle([
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#444444")),
                         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
                         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                        ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
                         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ]))
+                        ("FONTSIZE", (0, 0), (-1, 0), 7),
+                        ("BOTTOMPADDING", (0, 0), (-1, 0), 4),
+                        ("TOPPADDING", (0, 0), (-1, 0), 4),
 
+                        # Body rows
+                        ("FONTSIZE", (0, 1), (-1, -1), 8),
+                        ("ALIGN", (-3, 1), (-1, -1), "RIGHT"),  # align last 3 numeric cols
+                    ])
+
+                    # Stripe alternate rows
+                    for row_num in range(1, len(data)):
+                        if row_num % 2 == 0:
+                            style.add("BACKGROUND", (0, row_num), (-1, row_num), colors.whitesmoke)
+
+                    table.setStyle(style)
                     elements.append(table)
                 else:
                     elements.append(Paragraph("No data to display", styles["Normal"]))
