@@ -4,7 +4,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-import tempfile, os, base64
+import tempfile, os
 from datetime import datetime
 
 # --- Pure Python number to words ---
@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v11.6 Pure)")
+st.title("📑 Proforma Invoice Generator (v11.7 Pure)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -208,14 +208,14 @@ if agg_df is not None:
 
         col_widths = [
             table_width * 0.10,
-            table_width * 0.21,  # Item Description reduced
-            table_width * 0.12,  # Fabric widened
+            table_width * 0.21,
+            table_width * 0.12,
             table_width * 0.10,
             table_width * 0.15,
             table_width * 0.08,
             table_width * 0.07,
-            table_width * 0.08,  # FOB widened
-            table_width * 0.09   # Amount widened
+            table_width * 0.08,
+            table_width * 0.09
         ]
 
         table=Table(data,colWidths=col_widths,repeatRows=1)
@@ -275,12 +275,12 @@ if agg_df is not None:
 
         doc.build([outer_table])
 
-# --- Standard 2-click download ---
-with open(pdf_file, "rb") as f:
-    st.download_button(
-        "⬇️ Download Proforma Invoice",
-        f,
-        file_name="Proforma_Invoice.pdf",
-        mime="application/pdf"
-    )
-os.remove(pdf_file)
+        # --- Standard 2-click download ---
+        with open(pdf_file, "rb") as f:
+            st.download_button(
+                "⬇️ Download Proforma Invoice",
+                f,
+                file_name="Proforma_Invoice.pdf",
+                mime="application/pdf"
+            )
+        os.remove(pdf_file)
