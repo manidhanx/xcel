@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v11.2 Pure)")
+st.title("📑 Proforma Invoice Generator (v11.3 Pure)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -140,13 +140,13 @@ if agg_df is not None:
 
         elements=[]
         content_width = A4[0] - 100
+        inner_width = content_width - 6
 
         # --- Title ---
-        title_table = Table([["PROFORMA INVOICE"]], colWidths=[content_width])
+        title_table = Table([[Paragraph("PROFORMA INVOICE", bold)]], colWidths=[inner_width])
         title_table.setStyle(TableStyle([
             ("GRID",(0,0),(-1,-1),0.75,colors.black),
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
-            ("FONTNAME",(0,0),(-1,-1),"Helvetica-Bold"),
             ("FONTSIZE",(0,0),(-1,-1),14),
             ("TOPPADDING",(0,0),(-1,-1),8),
             ("BOTTOMPADDING",(0,0),(-1,-1),8),
@@ -154,24 +154,24 @@ if agg_df is not None:
         elements.append(title_table)
         elements.append(Spacer(1,12))
 
-        # --- Supplier & Consignee Block ---
+        # --- Supplier & Consignee Block (with Paragraphs) ---
         sup=[
-            ["<b>Supplier Name:</b> SAR APPARELS INDIA PVT.LTD.",pi_no],
-            ["Address: 6, Picaso Bithi, Kolkata - 700017","<b>Landmark order Reference:</b> "+str(order_no)],
-            ["Phone: 9817473373","<b>Buyer Name:</b> "+buyer_name],
-            ["Fax: N.A.","<b>Brand Name:</b> "+brand_name],
+            [Paragraph("<b>Supplier Name:</b> SAR APPARELS INDIA PVT.LTD.", normal), Paragraph(pi_no, normal)],
+            [Paragraph("Address: 6, Picaso Bithi, Kolkata - 700017", normal), Paragraph("<b>Landmark order Reference:</b> "+str(order_no), normal)],
+            [Paragraph("Phone: 9817473373", normal), Paragraph("<b>Buyer Name:</b> "+buyer_name, normal)],
+            [Paragraph("Fax: N.A.", normal), Paragraph("<b>Brand Name:</b> "+brand_name, normal)],
         ]
         con=[
-            ["<b>Consignee:</b>",payment_term],
-            [consignee_name,"<b>Bank Details (Including Swift/IBAN):</b>"],
-            [consignee_addr,"Beneficiary: SAR APPARELS INDIA PVT.LTD"],
-            [consignee_tel,"Account No: 2112819952"],
-            ["","Bank: Kotak Mahindra Bank Ltd"],
-            ["","Address: 2 Brabourne Road, Govind Bhavan, Ground Floor, Kolkata - 700001"],
-            ["","SWIFT: KKBKINBBCPC"],
-            ["","Bank Code: 0323"],
+            [Paragraph("<b>Consignee:</b>", normal), Paragraph(payment_term, normal)],
+            [Paragraph(consignee_name, normal), Paragraph("<b>Bank Details (Including Swift/IBAN):</b>", normal)],
+            [Paragraph(consignee_addr, normal), Paragraph("Beneficiary: SAR APPARELS INDIA PVT.LTD", normal)],
+            [Paragraph(consignee_tel, normal), Paragraph("Account No: 2112819952", normal)],
+            ["", Paragraph("Bank: Kotak Mahindra Bank Ltd", normal)],
+            ["", Paragraph("Address: 2 Brabourne Road, Govind Bhavan, Ground Floor, Kolkata - 700001", normal)],
+            ["", Paragraph("SWIFT: KKBKINBBCPC", normal)],
+            ["", Paragraph("Bank Code: 0323", normal)],
         ]
-        info_table=Table(sup+con,colWidths=[0.5*content_width,0.5*content_width])
+        info_table=Table(sup+con,colWidths=[0.5*inner_width,0.5*inner_width])
         info_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                         ("VALIGN",(0,0),(-1,-1),"TOP"),
                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
@@ -180,10 +180,10 @@ if agg_df is not None:
 
         # --- Shipment Info ---
         ship=[
-            ["<b>Loading Country:</b> "+str(made_in),"<b>Port of Loading:</b> "+str(loading_port)],
-            ["<b>Agreed Shipment Date:</b> "+str(ship_date),"<b>Description of goods:</b> "+str(order_of)]
+            [Paragraph("<b>Loading Country:</b> "+str(made_in), normal), Paragraph("<b>Port of Loading:</b> "+str(loading_port), normal)],
+            [Paragraph("<b>Agreed Shipment Date:</b> "+str(ship_date), normal), Paragraph("<b>Description of goods:</b> "+str(order_of), normal)]
         ]
-        ship_table=Table(ship,colWidths=[0.5*content_width,0.5*content_width])
+        ship_table=Table(ship,colWidths=[0.5*inner_width,0.5*inner_width])
         ship_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
         elements.append(ship_table)
@@ -197,15 +197,15 @@ if agg_df is not None:
         data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
 
         col_widths = [
-            content_width * 0.10,  # STYLE NO
-            content_width * 0.28,  # ITEM DESCRIPTION
-            content_width * 0.09,  # FABRIC TYPE
-            content_width * 0.10,  # H.S NO
-            content_width * 0.15,  # COMPOSITION
-            content_width * 0.08,  # ORIGIN
-            content_width * 0.07,  # QTY
-            content_width * 0.065, # FOB
-            content_width * 0.065  # AMOUNT
+            inner_width * 0.10,  # STYLE NO
+            inner_width * 0.25,  # ITEM DESCRIPTION
+            inner_width * 0.09,  # FABRIC TYPE
+            inner_width * 0.10,  # H.S NO
+            inner_width * 0.15,  # COMPOSITION
+            inner_width * 0.08,  # ORIGIN
+            inner_width * 0.07,  # QTY
+            inner_width * 0.075, # FOB
+            inner_width * 0.095  # AMOUNT
         ]
 
         table=Table(data,colWidths=col_widths,repeatRows=1)
@@ -231,24 +231,24 @@ if agg_df is not None:
 
         # --- Amount in Words Row ---
         amount_words=amount_to_words(total_amount)
-        words_table=Table([[f"TOTAL  US DOLLAR {amount_words}"]],colWidths=[content_width])
+        words_table=Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]],colWidths=[inner_width])
         words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                          ("FONTSIZE",(0,0),(-1,-1),8)]))
         elements.append(words_table)
 
         # --- Terms & Conditions ---
-        terms_table=Table([["Terms & Conditions (if any):"]],colWidths=[content_width])
+        terms_table=Table([[Paragraph("Terms & Conditions (if any):", normal)]],colWidths=[inner_width])
         terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                          ("FONTSIZE",(0,0),(-1,-1),8)]))
         elements.append(terms_table)
         elements.append(Spacer(1,24))
 
         # --- Signature ---
-        sig_img = "sarsign.png"  # constant image stored alongside script
+        sig_img = "sarsign.png"
         sign_table=Table([
             [Image(sig_img,width=150,height=50),
-             "Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)"]
-        ],colWidths=[0.5*content_width,0.5*content_width])
+             Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]
+        ],colWidths=[0.5*inner_width,0.5*inner_width])
         sign_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                         ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
                                         ("ALIGN",(0,0),(0,0),"LEFT"),
@@ -259,7 +259,7 @@ if agg_df is not None:
         # --- Outer Frame ---
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
         outer_table.setStyle(TableStyle([
-            ("GRID",(0,0),(-1,-1),1.5,colors.black),  # Official stampy frame
+            ("GRID",(0,0),(-1,-1),1.5,colors.black),  # Stampy outer frame
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
 
