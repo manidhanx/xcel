@@ -1,0 +1,233 @@
+import streamlit as st
+import pandas as pd
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+import tempfile
+import os
+from datetime import datetime
+
+st.set_page_config(page_title="Excel Style Aggregator", layout="centered")
+
+st.title("👕 Excel → PDF (Style Aggregator)")
+
+uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
+
+if uploaded_file:
+    # Load raw Excel (no header)
+    raw_df = pd.read_excel(uploaded_file, header=None)
+
+    # --- Extract key info ---
+    buyer_name = str(raw_df.iloc[0, 0]) if not pd.isna(raw_df.iloc[0, 0]) else None
+    order_no, brand, made_in, loading_port, ship_date, order_of = [None]*6
+    texture = None
+    country_of_origin = None
+
+    for i, row in raw_df.iterrows():
+        for j, cell in enumerate(row):
+            cell_val = str(cell).strip().lower()
+            if cell_val == "order no :":
+                try: order_no = row[j+2]
+                except: pass
+            elif cell_val == "brand :":
+                try: brand = row[j+1]
+                except: pass
+            elif cell_val == "made in country :":
+                try: 
+                    made_in = row[j+1]
+                    country_of_origin = row[j+1]
+                except: pass
+            elif cell_val == "loading port :":
+                try: loading_port = row[j+1]
+                except: pass
+            elif cell_val == "agreed ship date :":
+                try: ship_date = row[j+2]
+                except: pass
+            elif cell_val == "order of":
+                try: order_of = row[j+1]
+                except: pass
+            elif cell_val == "texture :":
+                try: texture = row[j+1]
+                except: pass
+
+    # --- Find the row index where "Style" appears ---
+    header_row_idx = None
+    style_col_idx = None
+    for i, row in raw_df.iterrows():
+        for j, cell in enumerate(row):
+            if str(cell).strip().lower() == "style":
+                header_row_idx = i
+                style_col_idx = j
+                break
+        if header_row_idx is not None:
+            break
+
+    if header_row_idx is None:
+        st.error("❌ Could not find a 'Style' header in the file.")
+    else:
+        # Use that row as header
+        df = pd.read_excel(uploaded_file, header=header_row_idx)
+        df = df.dropna(how="all")  # drop completely empty rows
+
+        st.write("### Preview of extracted data")
+        st.dataframe(df.head())
+
+        if "Style" not in df.columns:
+            st.error("❌ No 'Style' column found after parsing the file.")
+        else:
+            # Find the quantity column (where row 7="Total" and row 8="Qty")
+            qty_col = None
+            for col in df.columns:
+                try:
+                    if (str(df[col].iloc[6]).strip().lower() == "total" and 
+                        str(df[col].iloc[7]).strip().lower() == "qty"):
+                        qty_col = col
+                        break
+                except:
+                    continue
+
+            # Find the FOB price column (contains "Fob$")
+            fob_col = None
+            for col in df.columns:
+                if "fob$" in str(col).lower():
+                    fob_col = col
+                    break
+
+            # Build custom aggregated data
+            aggregated_data = []
+            
+            # Group by Style to get unique styles
+            unique_styles = df['Style'].dropna().unique()
+            
+            for style in unique_styles:
+                style_rows = df[df['Style'] == style]
+                
+                if len(style_rows) > 0:
+                    first_row = style_rows.iloc[0]
+                    
+                    # Get style-specific data from raw_df
+                    item_description = None
+                    composition = None
+                    
+                    # Find the style in raw_df to get adjacent values
+                    for i, row in raw_df.iterrows():
+                        for j, cell in enumerate(row):
+                            if str(cell).strip() == str(style).strip():
+                                try:
+                                    # Item description (next cell)
+                                    item_description = str(raw_df.iloc[i, j+1]) if j+1 < len(raw_df.columns) else None
+                                    # Composition (2 cells next)
+                                    composition = str(raw_df.iloc[i, j+2]) if j+2 < len(raw_df.columns) else None
+                                except:
+                                    pass
+                                break
+                        if item_description is not None:
+                            break
+                    
+                    # Calculate aggregated quantity
+                    total_qty = 0
+                    if qty_col and qty_col in style_rows.columns:
+                        total_qty = pd.to_numeric(style_rows[qty_col], errors='coerce').sum()
+                    
+                    # Get unit price (FOB)
+                    unit_price = 0
+                    if fob_col and fob_col in style_rows.columns:
+                        # Take the first non-zero price for this style
+                        prices = pd.to_numeric(style_rows[fob_col], errors='coerce').dropna()
+                        unit_price = prices.iloc[0] if len(prices) > 0 else 0
+                    
+                    # Calculate amount
+                    amount = total_qty * unit_price
+                    
+                    # Clean up values
+                    if pd.isna(item_description) or str(item_description) == 'nan':
+                        item_description = ""
+                    if pd.isna(composition) or str(composition) == 'nan':
+                        composition = ""
+                    
+                    aggregated_data.append({
+                        'STYLE NO.': style,
+                        'ITEM DESCRIPTION': item_description,
+                        'FABRIC TYPE (KNITTED/WOVEN)': texture if texture else "",
+                        'H.S NO (8digit)': "61112000",
+                        'COMPOSITION OF MATERIAL': composition,
+                        'COUNTRY OF ORIGIN': country_of_origin if country_of_origin else "",
+                        'QTY': total_qty,
+                        'UNIT PRICE FOB': unit_price,
+                        'AMOUNT': amount
+                    })
+
+            # Create DataFrame from aggregated data
+            agg_df = pd.DataFrame(aggregated_data)
+
+            st.write("### Aggregated Data (Custom Format)")
+            st.dataframe(agg_df)
+
+            # Show debug info
+            st.write("### Debug Info")
+            st.write(f"Quantity Column Found: {qty_col}")
+            st.write(f"FOB Column Found: {fob_col}")
+            st.write(f"Texture Found: {texture}")
+            st.write(f"Country of Origin: {country_of_origin}")
+
+            # Generate PDF
+            if st.button("Generate PDF"):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmpfile:
+                    pdf_file = tmpfile.name
+
+                doc = SimpleDocTemplate(pdf_file, pagesize=A4)
+                styles = getSampleStyleSheet()
+                elements = []
+
+                # --- Header Info ---
+                today = datetime.today().strftime("%d-%m-%Y")
+                header_info = [
+                    f"<b>Buyer:</b> {buyer_name}" if buyer_name else None,
+                    f"<b>Order No:</b> {order_no}" if order_no else None,
+                    f"<b>Brand:</b> {brand}" if brand else None,
+                    f"<b>Made in Country:</b> {made_in}" if made_in else None,
+                    f"<b>Loading Port:</b> {loading_port}" if loading_port else None,
+                    f"<b>Agreed Ship Date:</b> {ship_date}" if ship_date else None,
+                    f"<b>Order Of:</b> {order_of}" if order_of else None,
+                    f"<b>Report Date:</b> {today}"
+                ]
+
+                for line in header_info:
+                    if line:
+                        elements.append(Paragraph(line, styles["Normal"]))
+                elements.append(Spacer(1, 12))
+
+                # --- Table Data ---
+                if len(agg_df) > 0:
+                    # Prepare table data
+                    data = [agg_df.columns.tolist()]
+                    for _, row in agg_df.iterrows():
+                        formatted_row = []
+                        for val in row:
+                            if isinstance(val, (int, float)) and not pd.isna(val):
+                                formatted_row.append(f"{val:.2f}" if val % 1 != 0 else f"{int(val)}")
+                            else:
+                                formatted_row.append(str(val) if not pd.isna(val) else "")
+                        data.append(formatted_row)
+
+                    table = Table(data)
+                    table.setStyle(TableStyle([
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                        ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ]))
+
+                    elements.append(table)
+                else:
+                    elements.append(Paragraph("No data to display", styles["Normal"]))
+
+                doc.build(elements)
+
+                with open(pdf_file, "rb") as f:
+                    st.download_button("⬇️ Download PDF", f, file_name="style_report.pdf")
+
+                os.remove(pdf_file)
