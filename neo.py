@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v11.4 Pure)")
+st.title("📑 Proforma Invoice Generator (v11.5 Pure)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -148,15 +148,16 @@ if agg_df is not None:
         table_width = inner_width - 6
 
         # --- Header with logo ---
-        logo = Image("sarlogo.jpg", width=120, height=70)
+        logo = Image("sarlogo.jpg", width=100, height=55)
         title_table = Table([
-            [Paragraph("PROFORMA INVOICE", bold), logo]
-        ], colWidths=[0.7*inner_width, 0.3*inner_width])
+            [Paragraph("<font size=20><b>PROFORMA INVOICE</b></font>", bold), logo]
+        ], colWidths=[0.75*inner_width, 0.25*inner_width])
         title_table.setStyle(TableStyle([
             ("GRID",(0,0),(-1,-1),0.75,colors.black),
             ("ALIGN",(0,0),(0,0),"CENTER"),
+            ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
             ("ALIGN",(1,0),(1,0),"RIGHT"),
-            ("FONTSIZE",(0,0),(-1,-1),14),
+            ("FONTSIZE",(0,0),(-1,-1),20),
             ("TOPPADDING",(0,0),(-1,-1),8),
             ("BOTTOMPADDING",(0,0),(-1,-1),8),
         ]))
@@ -225,8 +226,10 @@ if agg_df is not None:
             ("ALIGN",(0,0),(-1,0),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
             ("FONTSIZE",(0,0),(-1,0),6.5),
-            ("ALIGN",(0,1),(5,-1),"LEFT"),
-            ("ALIGN",(6,1),(-1,-1),"RIGHT"),
+
+            ("ALIGN",(0,1),(5,-1),"CENTER"),   # Text cols (Style → Origin)
+            ("ALIGN",(6,1),(-1,-1),"RIGHT"),   # Numeric cols (Qty, FOB, Amount)
+
             ("FONTSIZE",(0,1),(-1,-1),8),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
             ("LEFTPADDING",(0,0),(-1,-1),4),
