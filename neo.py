@@ -10,7 +10,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="Excel Style Aggregator", layout="centered")
 
-st.title("👕 Excel → PDF (Style Aggregator - Fixed Qty + Robust Style)")
+st.title("👕 Excel → PDF (Style Aggregator - Fixed Qty v3)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -82,19 +82,25 @@ if uploaded_file:
         if not style_col:
             st.error("❌ Could not find a Style column in the file.")
         else:
-            # Find the "Total Qty" column
+            # --- Robust Qty column detection ---
             qty_col = None
             for col in df.columns:
-                if str(col).strip().lower() == "total qty":
+                col_clean = str(col).strip().lower().replace("  ", " ")
+                if "total" in col_clean and "qty" in col_clean:
                     qty_col = col
                     break
 
-            # Find the FOB price column
+            # --- FOB detection ---
             fob_col = None
             for col in df.columns:
                 if "fob" in str(col).lower():
                     fob_col = col
                     break
+
+            # Debug prints
+            st.write("Detected Style column:", style_col)
+            st.write("Detected Qty column:", qty_col)
+            st.write("Detected FOB column:", fob_col)
 
             # Build aggregated data
             aggregated_data = []
