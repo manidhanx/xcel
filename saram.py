@@ -1,4 +1,4 @@
-# proforma_v12.9.3_final_master_align_v1.py
+# proforma_v12.9.3_final_master_align_v2.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer
@@ -165,7 +165,6 @@ if agg_df is not None:
         spacer_to_origin = max(0, indent_inside_right_corrected - extra_left_shift)
 
         # Build master header table (title row + 4 header blocks) in one two-column table
-        # This allows the vertical centre divider to run from title underline down and ensures no gap when items table follows.
         title_para = Paragraph("PROFORMA INVOICE", title_style)
 
         # Left header (supplier)
@@ -248,7 +247,7 @@ if agg_df is not None:
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # right row3: three breaks between lines (requested)
+        # right row3: three breaks between lines
         right_row3_para = Paragraph(f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/><b>Remarks:</b> (if any)", row1_normal)
         right_row3_box = Table([[right_row3_para]], colWidths=[right_width])
         right_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
@@ -258,11 +257,11 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # (c) move CURRENCY to start of UNIT PRICE FOB column (index 7)
+        # move CURRENCY to start of UNIT PRICE FOB column (index 7)
         unit_price_col_index = 7
-        qty_left_rel_to_rightblock = sum(col_widths[:unit_price_col_index]) - left_width
-        qty_left_rel_to_rightblock = max(0, qty_left_rel_to_rightblock)
-        padding_needed = qty_left_rel_to_rightblock + 2  # small breathing
+        unit_left_rel_to_rightblock = sum(col_widths[:unit_price_col_index]) - left_width
+        unit_left_rel_to_rightblock = max(0, unit_left_rel_to_rightblock)
+        padding_needed = unit_left_rel_to_rightblock + 2
 
         currency_para = Paragraph("CURRENCY: USD", row1_normal)
         row4_height = 56
@@ -275,34 +274,37 @@ if agg_df is not None:
             ("TOPPADDING",(0,0),(0,0),0),("BOTTOMPADDING",(0,0),(0,0),2),
         ]))
 
-        # Build master rows: Title row MUST use same left/right columns so center divider lines up to title.
+        # Build master rows: title row spanned across both columns to keep centered, then header blocks
         master_rows = []
-        # row 0: title in left cell (centered), empty right cell
-        master_rows.append([Paragraph("PROFORMA INVOICE", title_style), ""])
-        # rows 1-4: header blocks
+        master_rows.append([title_para, ""])  # we will span this row across both cols
         master_rows.append([supplier_stack, right_stack])
         master_rows.append([consignee_box, payment_block])
         master_rows.append([left_row3_box, right_row3_box])
         master_rows.append([left_row4_box, right_row4_box])
 
-        # create master table with 2 columns; no extra paddings to avoid gaps
+        # create master table with 2 columns; adjust rowHeights so title row small
         master_table = Table(master_rows, colWidths=[left_width, right_width],
                              rowHeights=[18, None, None, 56, row4_height])
-        master_table.setStyle(TableStyle([
+        master_table_style = [
             ("VALIGN",(0,0),(1,4),"TOP"),
-            # center divider line runs full height of this master table (title -> row4)
-            ("LINEAFTER",(0,0),(0,4),0.75,colors.black),
+            # center divider now starts from row 1 (so it stops at the line right below title)
+            ("LINEAFTER",(0,1),(0,4),0.75,colors.black),
             # underline title and row separators
-            ("LINEBELOW",(0,0),(1,0),0.9,colors.black),  # title underline (thick)
+            ("SPAN",(0,0),(1,0)),  # span title across both cols so it's centered
+            ("ALIGN",(0,0),(1,0),"CENTER"),("VALIGN",(0,0),(1,0),"MIDDLE"),
+            ("LINEBELOW",(0,0),(1,0),0.9,colors.black),  # title underline (thicker)
             ("LINEBELOW",(0,1),(1,1),0.35,colors.black),
             ("LINEBELOW",(0,2),(1,2),0.35,colors.black),
             ("LINEBELOW",(0,3),(1,3),0.35,colors.black),
             ("LINEBELOW",(0,4),(1,4),0.9,colors.black),
-            ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
-            ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0),
-            # ensure title cell centered and doesn't draw a box
-            ("ALIGN",(0,0),(0,0),"CENTER"),("VALIGN",(0,0),(0,0),"MIDDLE"),
-        ]))
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,4),(1,4),0),
+            ("TOPPADDING",(0,4),(1,4),0),
+        ]
+        master_table.setStyle(TableStyle(master_table_style))
 
         # ---------- ITEMS TABLE ----------
         header_labels = [
@@ -321,7 +323,7 @@ if agg_df is not None:
         total_qty = agg_df["QTY"].sum()
         total_amount = agg_df["AMOUNT"].astype(float).sum()
 
-        # keep 10 extra blank rows (as requested before)
+        # keep 10 extra blank rows
         EXTRA_BLANK_ROWS = 10
         for _ in range(EXTRA_BLANK_ROWS):
             body_rows.append([""]*len(header_row))
@@ -330,12 +332,21 @@ if agg_df is not None:
         total_row = ["TOTAL","","","","",f"{int(total_qty):,}","",None,None]
         data.append(total_row)
 
-        header_row_h, body_row_h, total_row_h = 40, 12, 16
-        row_heights = [header_row_h] + [body_row_h]*(len(body_rows)) + [total_row_h]
+        # Row heights: add a small extra top breathing to the first body row
+        header_row_h = 40
+        body_row_h = 12
+        first_body_extra = 4  # extra top breathing for first body row
+        total_row_h = 16
+
+        body_count = len(body_rows)
+        if body_count >= 1:
+            # first body row gets extra height
+            row_heights = [header_row_h, body_row_h + first_body_extra] + [body_row_h]*(body_count-1) + [total_row_h]
+        else:
+            row_heights = [header_row_h] + [body_row_h]*body_count + [total_row_h]
 
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
         items_style = TableStyle([
-            # make inner row dividers white so header looks clean but column dividers black — we'll add them
             ("GRID",(0,1),(-1,-2),0.25,colors.white),
             ("LINEBELOW",(0,0),(-1,0),0.5,colors.black),
             ("BACKGROUND",(0,0),(-1,0),colors.white),
@@ -346,16 +357,13 @@ if agg_df is not None:
             ("FONTSIZE",(0,1),(-1,-1),7),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
             ("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3),
-            # ensure this table starts immediately under master_table (no top padding)
             ("TOPPADDING",(0,0),(-1,-1),0),
         ])
         ncols = len(col_widths)
-        # column divider lines for header and body
         for c in range(ncols-1):
-            items_style.add("LINEAFTER",(c,0),(c,0),0.5,colors.black)           # header column dividers
-            items_style.add("LINEAFTER",(c,1),(c,len(data)-2),0.25,colors.black)  # body column dividers
+            items_style.add("LINEAFTER",(c,0),(c,0),0.5,colors.black)
+            items_style.add("LINEAFTER",(c,1),(c,len(data)-2),0.25,colors.black)
 
-        # white horizontal line for row1 of values (as requested previously)
         items_style.add("LINEBELOW",(0,1),(-1,1),0.25,colors.white)
 
         total_idx = len(data)-1
@@ -376,7 +384,6 @@ if agg_df is not None:
         items_style.add("FONTNAME",(7,total_idx),(8,total_idx),"Helvetica-Bold")
         items_style.add("FONTSIZE",(7,total_idx),(8,total_idx),7)
 
-        # make clear black line above and below total row
         items_style.add("LINEABOVE",(0,total_idx),(-1,total_idx),0.5,colors.black)
         items_style.add("LINEBELOW",(0,total_idx),(-1,total_idx),0.5,colors.black)
         items_style.add("LINEAFTER",(4,total_idx),(4,total_idx),0.6,colors.black)
@@ -386,7 +393,7 @@ if agg_df is not None:
 
         items_table.setStyle(items_style)
 
-        # update total row values and recreate so spans pick up
+        # update total row values
         data[total_idx][7] = f"USD {total_amount:,.2f}"
         data[total_idx][8] = ""
         data[total_idx][5] = f"{int(total_qty):,}"
@@ -395,8 +402,7 @@ if agg_df is not None:
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
         items_table.setStyle(items_style)
 
-        # Now combine master_table (title + header) and items_table into a wrapper that stacks them flush.
-        # We'll make a two-row single-column table: first cell = master_table, second cell = items_table (spanning full width).
+        # Stack master_table and items_table flush so there's no gap between them
         stacked = Table([[master_table],[items_table]], colWidths=[available_width], rowHeights=[None, None])
         stacked.setStyle(TableStyle([
             ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
