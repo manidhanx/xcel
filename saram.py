@@ -1,4 +1,4 @@
-# proforma_v12.9.3_fix_row3_row4_final_aligns.py
+# proforma_v12.9.3_fix_row3_row4_align_update.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.9.3 - final tweaks)")
+st.title("📑 Proforma Invoice Generator (v12.9.3)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -255,9 +255,9 @@ if agg_df is not None:
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # === Row3 right: inserted FOUR <br/> between the two lines ===
+        # === Row3 right: inserted THREE <br/> between the two lines (reduced by one) ===
         right_row3_para = Paragraph(
-            f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/><br/>"  # 4 breaks total
+            f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/>"  # 3 breaks now
             f"<b>Remarks:</b> (if any)",
             row1_normal
         )
@@ -268,9 +268,8 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # === Row4 right: ensure bottom-right aligned by using an inner table with explicit rowHeight and alignment ===
+        # === Row4 right: ensure bottom-right aligned (explicit) ===
         currency_para = Paragraph("CURRENCY: USD", row1_normal)
-        # inner table sized slightly narrower so alignment looks neat
         inner_currency = Table([[currency_para]], colWidths=[right_width - 8], rowHeights=[28])
         inner_currency.setStyle(TableStyle([
             ("ALIGN",(0,0),(0,0),"RIGHT"),
@@ -280,10 +279,10 @@ if agg_df is not None:
             ("TOPPADDING",(0,0),(0,0),0),
             ("BOTTOMPADDING",(0,0),(0,0),0),
         ]))
-        # outer wrapper to hold the inner and force bottom alignment of the cell
         right_row4_box = Table([[inner_currency]], colWidths=[right_width])
         right_row4_box.setStyle(TableStyle([
             ("VALIGN",(0,0),(0,0),"BOTTOM"),
+            ("ALIGN",(0,0),(0,0),"RIGHT"),
             ("LEFTPADDING",(0,0),(0,0),4),
             ("RIGHTPADDING",(0,0),(0,0),4),
             ("TOPPADDING",(0,0),(0,0),0),
