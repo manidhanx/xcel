@@ -1,4 +1,4 @@
-# proforma_v12.8.4.py
+# proforma_v12.8.5.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.8.4)")
+st.title("📑 Proforma Invoice Generator (v12.8.5)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -41,7 +41,6 @@ order_no = made_in = loading_port = ship_date = order_of = texture = country_of_
 if uploaded_file:
     raw_df = pd.read_excel(uploaded_file, header=None)
 
-    # extract basic fields
     for i, row in raw_df.iterrows():
         for j, cell in enumerate(row):
             cell_val = str(cell).strip().lower()
@@ -178,18 +177,16 @@ if agg_df is not None:
         left_width = sum(col_widths[:3])
         right_width = inner_width - left_width
 
-        # exact left-edge of ORIGIN column relative to items-table-left
-        origin_left_absolute = sum(col_widths[:5])  # left edge of ORIGIN (= sum widths before ORIGIN)
+        origin_left_absolute = sum(col_widths[:5])
         indent_inside_right = origin_left_absolute - left_width
 
-        # account for items table LEFTPADDING which visually shifts cell content right
         items_cell_left_padding = 4
         indent_inside_right_corrected = indent_inside_right - items_cell_left_padding
         if indent_inside_right_corrected < 0:
             indent_inside_right_corrected = 0
 
-        # EXTRA left-shift: subtract QTY column width to correct accidental alignment to FOB (empirical fix)
-        extra_left_shift = col_widths[6]  # QTY column width
+        # EXTRA left shift increased by one more QTY column to move left by one "cell" equivalent
+        extra_left_shift = col_widths[6] * 2  # doubled (previously was col_widths[6])
         spacer_cand = indent_inside_right_corrected - extra_left_shift
         spacer_to_origin = max(0, spacer_cand)
 
@@ -216,11 +213,11 @@ if agg_df is not None:
         supplier_stack = Table([[supplier_title],[supplier_contact]], colWidths=[left_width])
         supplier_stack.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0)]))
 
-        # RIGHT top (PI) - reduce left padding slightly so it doesn't shift right
+        # RIGHT top (PI) - set same left padding as payment_block to align vertical starts
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
         right_top.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),2),  # reduced from 4 to 2
+            ("LEFTPADDING",(0,0),(-1,-1),4),   # same as payment_block left breathing space
             ("RIGHTPADDING",(0,0),(-1,-1),3),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LINEBELOW",(0,0),(0,0),0.6,colors.black)
@@ -233,23 +230,20 @@ if agg_df is not None:
         )
         right_bottom = Table([[right_bottom_para]], colWidths=[right_width])
         right_bottom.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),2),  # reduced
+            ("LEFTPADDING",(0,0),(-1,-1),4),
             ("RIGHTPADDING",(0,0),(-1,-1),3),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
         ]))
 
         right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width], rowHeights=[None, None])
-        right_stack.setStyle(TableStyle([
-            ("VALIGN",(0,0),(0,0),"TOP"),
-            ("VALIGN",(0,1),(0,1),"TOP"),
-        ]))
+        right_stack.setStyle(TableStyle([("VALIGN",(0,0),(0,0),"TOP"),("VALIGN",(0,1),(0,1),"TOP")]))
 
         # Consignee (left)
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", row1_normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),2),("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # Row2 right: Payment & Banks with corrected spacer_to_origin
+        # Row2 right: Payment & Banks with corrected spacer_to_origin (moved left by extra shift)
         pay_label = Paragraph("Payment Term:", label_small)
         pay_value = Paragraph(payment_term_val, value_small)
         pay_term_tbl = Table([[pay_label, pay_value]], colWidths=[right_width*0.28, right_width*0.72])
@@ -262,7 +256,7 @@ if agg_df is not None:
         bank_heading_tbl = Table([[bank_heading]], colWidths=[right_width])
         bank_heading_tbl.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),2)]))
 
-        colon_w = 9  # slightly narrower
+        colon_w = 9
         label_col_w = max(80, table_width * 0.08)
         remaining = right_width - label_col_w - spacer_to_origin - colon_w - 6
         value_col_w = max(90, remaining)
@@ -285,7 +279,6 @@ if agg_df is not None:
         bank_inner = Table(bank_rows, colWidths=[label_col_w, spacer_to_origin, colon_w, value_col_w])
         bank_inner.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
 
-        # add left breather
         payment_block = Table([[pay_term_tbl],[blank_row],[bank_heading_tbl],[bank_inner]], colWidths=[right_width])
         payment_block.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),2),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
 
@@ -311,7 +304,7 @@ if agg_df is not None:
         elements.append(header_table)
         elements.append(Spacer(1,6))
 
-        # items table (use col_widths computed above)
+        # items table
         data=[list(agg_df.columns)]
         for _,row in agg_df.iterrows(): data.append(list(row))
         total_qty=agg_df["QTY"].sum()
@@ -325,7 +318,6 @@ if agg_df is not None:
         table.setStyle(style)
         elements.append(table)
 
-        # amount words & footer
         amount_words=amount_to_words(total_amount)
         words_table=Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]],colWidths=[inner_width])
         words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),]))
