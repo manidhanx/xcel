@@ -1,4 +1,4 @@
-# proforma_v12.9.3_fix_row3_right.py
+# proforma_v12.9.3_fix_row3_right_with_table_padding.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.9.3)")
+st.title("📑 Proforma Invoice Generator (v12.9.3 - table padded)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -110,6 +110,8 @@ if uploaded_file:
                     amount=total_qty*unit_price
                     aggregated_data.append([style,desc,texture or "Knitted","61112000",comp,
                         country_of_origin or "India",int(total_qty),f"{unit_price:.2f}",f"{amount:.2f}"])
+
+
             agg_df=pd.DataFrame(aggregated_data,columns=[
                 "STYLE NO.","ITEM DESCRIPTION","FABRIC TYPE","H.S NO","COMPOSITION","ORIGIN","QTY","FOB","AMOUNT"
             ])
@@ -143,7 +145,7 @@ if agg_df is not None:
         supplier_small_label = ParagraphStyle("supplier_small_label", parent=normal, fontName="Helvetica", fontSize=6)
         supplier_small_value = ParagraphStyle("supplier_small_value", parent=normal, fontName="Helvetica", fontSize=6)
         right_block_style = ParagraphStyle("right_block", parent=normal, fontName="Helvetica", fontSize=8, leading=10)
-        right_top_style = ParagraphStyle("right_top", parent=normal, fontName="Helvetica-Bold", fontSize=8, leading=9)
+        right_top_style = ParagraphStyle("right_top", parent=normal, fontName="Helvetica-Bold",fontSize=8, leading=9)
         row1_font_size = 8
         row1_normal = ParagraphStyle("row1_normal", parent=normal, fontName="Helvetica", fontSize=row1_font_size)
         payment_header_style=ParagraphStyle("payment_header", parent=normal, fontName="Helvetica-Bold", fontSize=7)
@@ -300,14 +302,40 @@ if agg_df is not None:
         elements.append(header_table)
         # no spacer — header bottom line is the top border of the items table
 
-        # items table (columns sum to available_width)
-        data=[list(agg_df.columns)]
-        for _,row in agg_df.iterrows(): data.append(list(row))
-        total_qty = agg_df["QTY"].sum()
-        total_amount = agg_df["AMOUNT"].astype(float).sum()
-        data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
+        # ---------------------- ITEMS / STYLE TABLE (modified per your request) ----------------------
+        # - increase header height to feel like 3 header rows
+        # - add 12 extra blank rows to the body (actual_rows + 12)
+        # - reduce font sizes for header & body, and make row heights compact/tight
+        header_row = list(agg_df.columns)
+        body_rows = [list(row) for _, row in agg_df.iterrows()]
+        total_row = ["TOTAL","","","","","",f"{int(agg_df['QTY'].sum()):,}","USD",f"{agg_df['AMOUNT'].astype(float).sum():,.2f}"]
 
-        items_table = Table(data, colWidths=col_widths, repeatRows=1)
+        # add 12 extra blank rows irrespective of actual body count
+        EXTRA_BLANK_ROWS = 12
+        actual_body_count = len(body_rows)
+        body_count = actual_body_count + EXTRA_BLANK_ROWS
+
+        # pad body with empty rows to reach actual + 12
+        if actual_body_count < body_count:
+            empty_row = [""] * len(header_row)
+            for _ in range(body_count - actual_body_count):
+                body_rows.append(empty_row.copy())
+
+        data = [header_row] + body_rows + [total_row]
+
+        # header height increased (3 rows feel); keep body rows compact/tight
+        header_row_height = 54   # increased to give 3-row visual header (you can tweak this)
+        body_row_height = 16     # compact row height for tight spacing
+        total_row_height = body_row_height + 4
+
+        # make sure rowHeights list length matches data rows
+        row_heights = [header_row_height] + [body_row_height] * body_count + [total_row_height]
+
+        # reduce font sizes inside style table for compactness
+        header_font_size = 6.5
+        body_font_size = 7
+
+        items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
         items_style = TableStyle([
             ("LINEBELOW",(0,0),(-1,0),0.25,colors.black),
             ("GRID",(0,1),(-1,-1),0.25,colors.black),
@@ -315,27 +343,29 @@ if agg_df is not None:
             ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
             ("ALIGN",(0,0),(-1,0),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-            ("FONTSIZE",(0,0),(-1,0),7),
+            ("FONTSIZE",(0,0),(-1,0),header_font_size),
             ("ALIGN",(0,1),(5,-1),"CENTER"),
             ("ALIGN",(6,1),(-1,-1),"RIGHT"),
-            ("FONTSIZE",(0,1),(-1,-1),8),
+            ("FONTSIZE",(0,1),(-1,-1),body_font_size),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ("LEFTPADDING",(0,0),(-1,-1),4),
-            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("LEFTPADDING",(0,0),(-1,-1),3),
+            ("RIGHTPADDING",(0,0),(-1,-1),3),
         ])
         items_style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
         items_style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.lightgrey)
         items_table.setStyle(items_style)
+        # --------------------------------------------------------------------------------------------
 
         elements.append(items_table)
 
         # amount words, terms & signature (unchanged)
+        total_amount = agg_df["AMOUNT"].astype(float).sum()
         amount_words = amount_to_words(total_amount)
         words_table = Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]], colWidths=[available_width])
         words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
         elements.append(words_table)
 
-        terms_table = Table([[Paragraph("Terms & Conditions (if any):", normal)]], colWidths=[available_width])
+        terms_table = Table([[Paragraph("Terms & Conditions (if any):", normal)]],colWidths=[available_width])
         terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
         elements.append(terms_table)
         elements.append(Spacer(1,12))
