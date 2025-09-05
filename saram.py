@@ -1,4 +1,4 @@
-# proforma_v12.8.6.py
+# proforma_v12.8.7.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.8.6)")
+st.title("📑 Proforma Invoice Generator (v12.8.7)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -41,6 +41,7 @@ order_no = made_in = loading_port = ship_date = order_of = texture = country_of_
 if uploaded_file:
     raw_df = pd.read_excel(uploaded_file, header=None)
 
+    # --- extract key fields ---
     for i, row in raw_df.iterrows():
         for j, cell in enumerate(row):
             cell_val = str(cell).strip().lower()
@@ -68,6 +69,7 @@ if uploaded_file:
     if isinstance(ship_date, (datetime, pd.Timestamp)):
         ship_date = ship_date.strftime("%d/%m/%Y")
 
+    # find header row (style)
     header_row_idx = None
     for i, row in raw_df.iterrows():
         if row.astype(str).str.strip().str.lower().eq("style").any():
@@ -81,6 +83,7 @@ if uploaded_file:
         df.columns = [" ".join([str(x) for x in col if str(x)!="nan"]).strip() for col in df.columns.values]
         df = df.dropna(how="all")
 
+        # detect columns
         style_col = next((c for c in df.columns if str(c).strip().lower().startswith("style")), None)
         qty_col, value_col_index = None, None
         for idx, col in enumerate(df.columns):
@@ -116,7 +119,7 @@ if uploaded_file:
             st.write("### ✅ Parsed Order Data")
             st.dataframe(agg_df)
 
-# inputs & generate
+# --- inputs & generate ---
 if agg_df is not None:
     st.write("### ✍️ Enter Invoice Details")
     today_str = datetime.today().strftime("%d/%m/%Y")
@@ -136,6 +139,7 @@ if agg_df is not None:
         styles=getSampleStyleSheet()
         normal=styles["Normal"]
 
+        # paragraph styles
         title_style = ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)
         supplier_label = ParagraphStyle("supplier_label", parent=normal, fontName="Helvetica-Bold", fontSize=8)
         supplier_company = ParagraphStyle("supplier_company", parent=normal, fontName="Helvetica-Bold", fontSize=7)
@@ -157,7 +161,7 @@ if agg_df is not None:
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # column proportions & pre-calc widths
+        # column proportions & widths (pre-calc)
         style_prop = 0.125
         item_prop = 0.185
         fabric_prop = 0.12
@@ -177,49 +181,65 @@ if agg_df is not None:
         left_width = sum(col_widths[:3])
         right_width = inner_width - left_width
 
+        # exact left edge of ORIGIN relative to items-table-left
         origin_left_absolute = sum(col_widths[:5])
         indent_inside_right = origin_left_absolute - left_width
 
-        # account for items table per-cell left padding
+        # account for items table cell left padding (we use LEFTPADDING=4 on items)
         items_cell_left_padding = 4
         indent_inside_right_corrected = indent_inside_right - items_cell_left_padding
         if indent_inside_right_corrected < 0:
             indent_inside_right_corrected = 0
 
-        # EXTRA left shift: move further left by one more QTY cell (now 3x)
-        extra_left_shift = col_widths[6] * 3
+        # extra left shift (empirical) to ensure ':-' aligns with ORIGIN start.
+        # previously iterated; here we use 2*QTY width (tuned) and clamp.
+        extra_left_shift = col_widths[6] * 2
         spacer_cand = indent_inside_right_corrected - extra_left_shift
         spacer_to_origin = max(0, spacer_cand)
 
-        # build header blocks
+        # ---------------- build header ----------------
         elements.append(Table([[Paragraph("PROFORMA INVOICE", title_style)]], colWidths=[content_width], style=[
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("TOPPADDING",(0,0),(-1,-1),4),
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
+        # LEFT: supplier stacked
         supplier_title = Table([
             [Paragraph("Supplier Name:", supplier_label)],
             [Paragraph("SAR APPARELS INDIA PVT.LTD.", supplier_company)]
         ], colWidths=[left_width])
-        supplier_title.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        supplier_title.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),2),
+            ("VALIGN",(0,0),(-1,-1),"TOP")
+        ]))
 
         supplier_contact = Table([
             [Paragraph("Address:", supplier_small_label), Paragraph("6, Picaso Bithi, Kolkata - 700017", supplier_small_value)],
             [Paragraph("Phone:", supplier_small_label), Paragraph("9817473373", supplier_small_value)],
             [Paragraph("Fax:", supplier_small_label), Paragraph("N.A.", supplier_small_value)]
         ], colWidths=[left_width*0.30, left_width*0.70])
-        supplier_contact.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        supplier_contact.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),2),
+            ("TOPPADDING",(0,0),(-1,-1),1),("BOTTOMPADDING",(0,0),(-1,-1),1),
+            ("VALIGN",(0,0),(-1,-1),"TOP")
+        ]))
 
         supplier_stack = Table([[supplier_title],[supplier_contact]], colWidths=[left_width])
-        supplier_stack.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0)]))
+        supplier_stack.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
+        ]))
 
-        # RIGHT top (PI) - set left padding to 0 so it starts at same anchor as payment_block
+        # RIGHT: top (PI) and bottom (order ref)
+        # make right_top start at same left anchor as payment_block by reducing its internal left padding
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
         right_top.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("LEFTPADDING",(0,0),(-1,-1),0),  # removed extra so it lines with payment block
             ("RIGHTPADDING",(0,0),(-1,-1),3),
+            ("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LINEBELOW",(0,0),(0,0),0.6,colors.black)
         ]))
@@ -233,23 +253,37 @@ if agg_df is not None:
         right_bottom.setStyle(TableStyle([
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),3),
-            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),2),
+            ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
 
-        right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width], rowHeights=[None, None])
-        right_stack.setStyle(TableStyle([("VALIGN",(0,0),(0,0),"TOP"),("VALIGN",(0,1),(0,1),"TOP")]))
+        right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width])
+        right_stack.setStyle(TableStyle([
+            ("VALIGN",(0,0),(0,0),"TOP"),("VALIGN",(0,1),(0,1),"TOP"),
+            ("LEFTPADDING",(0,0),(0,1),0),("RIGHTPADDING",(0,0),(0,1),0)
+        ]))
 
-        # Consignee (left)
+        # ROW2 LEFT: Consignee (same size as row1)
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", row1_normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
-        consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),2),("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        consignee_box.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),2),
+            ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),
+            ("VALIGN",(0,0),(-1,-1),"TOP")
+        ]))
 
-        # Row2 right: Payment & Banks with corrected spacer_to_origin (moved left more)
+        # ROW2 RIGHT: Payment & Bank block
         pay_label = Paragraph("Payment Term:", label_small)
         pay_value = Paragraph(payment_term_val, value_small)
         pay_term_tbl = Table([[pay_label, pay_value]], colWidths=[right_width*0.28, right_width*0.72])
-        pay_term_tbl.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0)]))
+        pay_term_tbl.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)
+        ]))
 
+        # tight blank row (kept small)
         blank_row = Table([[""]], colWidths=[right_width])
         blank_row.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2)]))
 
@@ -257,11 +291,15 @@ if agg_df is not None:
         bank_heading_tbl = Table([[bank_heading]], colWidths=[right_width])
         bank_heading_tbl.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),2)]))
 
+        # prepare bank inner grid: [label | spacer | ':-' | value]
         colon_w = 9
         label_col_w = max(80, table_width * 0.08)
+
+        # spacer_to_origin determined above; ensures left edge of ':-' column aligns with ORIGIN cell start visually
         remaining = right_width - label_col_w - spacer_to_origin - colon_w - 6
         value_col_w = max(90, remaining)
 
+        # bank address as a single line (per your instruction)
         bank_rows = []
         def add_bank_row(lbl, val, continuation=False):
             if continuation:
@@ -272,23 +310,41 @@ if agg_df is not None:
         add_bank_row("Beneficiary", "SAR APPARELS INDIA PVT.LTD")
         add_bank_row("Account No", "2112819952")
         add_bank_row("BANK'S NAME", "KOTAK MAHINDRA BANK LTD")
-        add_bank_row("BANK ADDRESS", "2 BRABOURNE ROAD, GOVIND BHAVAN, GROUND FLOOR,")
-        add_bank_row("", "KOLKATA-700001", continuation=True)
+        # single-line address as requested
+        add_bank_row("BANK ADDRESS", "2 BRABOURNE ROAD, GOVIND BHAVAN, GROUND FLOOR, KOLKATA-700001")
         add_bank_row("SWIFT CODE", "KKBKINNBCPC")
         add_bank_row("BANK CODE", "0323")
 
         bank_inner = Table(bank_rows, colWidths=[label_col_w, spacer_to_origin, colon_w, value_col_w])
-        bank_inner.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
+        bank_inner.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)
+        ]))
 
-        # set payment_block left padding to 0 so its left edge lines with right_stack left edge
+        # payment_block: restore left breathing space so it doesn't hug center divider
         payment_block = Table([[pay_term_tbl],[blank_row],[bank_heading_tbl],[bank_inner]], colWidths=[right_width])
-        payment_block.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),2),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
+        payment_block.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),4),   # restored breather
+            ("RIGHTPADDING",(0,0),(-1,-1),2),
+            ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)
+        ]))
 
-        left_row3_para = Paragraph(f"<b>Loading Country:</b> {made_in or ''}<br/><b>Port of Loading:</b> {loading_port or ''}<br/><b>Agreed Shipment Date:</b> {ship_date or ''}", normal)
+        # ROW3 & ROW4 (unchanged logically)
+        left_row3_para = Paragraph(
+            f"<b>Loading Country:</b> {made_in or ''}<br/>"
+            f"<b>Port of Loading:</b> {loading_port or ''}<br/>"
+            f"<b>Agreed Shipment Date:</b> {ship_date or ''}", normal
+        )
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        right_row3_para = Paragraph(f"<b>Loading Country:</b> {made_in or ''}<br/><b>L/C Advising Bank:</b> (If applicable)<br/><b>Remarks:</b> (if any)", normal)
+        right_row3_para = Paragraph(
+            f"<b>Loading Country:</b> {made_in or ''}<br/>"
+            f"<b>L/C Advising Bank:</b> (If applicable)<br/>"
+            f"<b>Remarks:</b> (if any)", normal
+        )
         right_row3_box = Table([[right_row3_para]], colWidths=[right_width])
         right_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
@@ -300,43 +356,100 @@ if agg_df is not None:
         right_row4_box = Table([[right_row4_para]], colWidths=[right_width])
         right_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        header_table = Table([[supplier_stack, right_stack],[consignee_box, payment_block],[left_row3_box, right_row3_box],[left_row4_box, right_row4_box]], colWidths=[left_width, right_width])
-        header_table.setStyle(TableStyle([("VALIGN",(0,0),(0,3),"TOP"),("VALIGN",(1,0),(1,3),"TOP"),("LINEAFTER",(0,0),(0,3),0.75,colors.black),("LINEBELOW",(0,0),(1,0),0.35,colors.black),("LINEBELOW",(0,1),(1,1),0.35,colors.black),("LINEBELOW",(0,2),(1,2),0.35,colors.black),("LINEBELOW",(0,3),(1,3),0.5,colors.black),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),]))
+        # assemble header table (4 blocks)
+        header_table = Table([
+            [supplier_stack, right_stack],
+            [consignee_box, payment_block],
+            [left_row3_box, right_row3_box],
+            [left_row4_box, right_row4_box]
+        ], colWidths=[left_width, right_width])
+
+        # header borders: ensure dividers span the full width of header_table (left to right of outer frame)
+        header_table.setStyle(TableStyle([
+            ("VALIGN",(0,0),(1,3),"TOP"),
+            ("LINEAFTER",(0,0),(0,3),0.75,colors.black),    # vertical center divider full height
+            ("LINEBELOW",(0,0),(1,0),0.35,colors.black),
+            ("LINEBELOW",(0,1),(1,1),0.35,colors.black),
+            ("LINEBELOW",(0,2),(1,2),0.35,colors.black),
+            ("LINEBELOW",(0,3),(1,3),0.5,colors.black),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),2),
+            ("BOTTOMPADDING",(0,0),(-1,-1),2),
+        ]))
 
         elements.append(header_table)
-        elements.append(Spacer(1,6))
 
-        # items table
+        # remove any stray blank rows between header and items — keep only subtle spacing
+        elements.append(Spacer(1,4))   # small gap only
+
+        # ---------------- items table ----------------
         data=[list(agg_df.columns)]
-        for _,row in agg_df.iterrows(): data.append(list(row))
+        for _,row in agg_df.iterrows():
+            data.append(list(row))
         total_qty=agg_df["QTY"].sum()
         total_amount=agg_df["AMOUNT"].astype(float).sum()
         data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
 
-        table=Table(data,colWidths=col_widths,repeatRows=1)
-        style=TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("BACKGROUND",(0,0),(-1,0),colors.black),("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),("ALIGN",(0,0),(-1,0),"CENTER"),("FONTNAME",(0,0),(-1,-1),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,0),7),("ALIGN",(0,1),(5,-1),"CENTER"),("ALIGN",(6,1),(-1,-1),"RIGHT"),("FONTSIZE",(0,1),(-1,-1),8),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),])
-        style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
-        style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.lightgrey)
-        table.setStyle(style)
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        table_style = TableStyle([
+            ("GRID",(0,0),(-1,-1),0.25,colors.black),
+            ("BACKGROUND",(0,0),(-1,0),colors.black),
+            ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
+            ("ALIGN",(0,0),(-1,0),"CENTER"),
+            ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+            ("FONTSIZE",(0,0),(-1,0),7),
+            ("ALIGN",(0,1),(5,-1),"CENTER"),
+            ("ALIGN",(6,1),(-1,-1),"RIGHT"),
+            ("FONTSIZE",(0,1),(-1,-1),8),
+            ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+            ("LEFTPADDING",(0,0),(-1,-1),4),   # important: this causes visual shift; we accounted for it earlier
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+        ])
+        table_style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
+        table_style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.lightgrey)
+        table.setStyle(table_style)
         elements.append(table)
 
-        amount_words=amount_to_words(total_amount)
-        words_table=Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]],colWidths=[inner_width])
-        words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),]))
+        # amount in words
+        amount_words = amount_to_words(total_amount)
+        words_table = Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]], colWidths=[inner_width])
+        words_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),0.25,colors.black),
+            ("FONTSIZE",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),4),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+        ]))
         elements.append(words_table)
 
+        # terms
         terms_table=Table([[Paragraph("Terms & Conditions (if any):", normal)]],colWidths=[inner_width])
-        terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),]))
+        terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
         elements.append(terms_table)
         elements.append(Spacer(1,12))
 
+        # signature
         sig_img = "sarsign.png"
-        sign_table=Table([[Image(sig_img,width=150,height=50), Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]],colWidths=[0.5*inner_width,0.5*inner_width])
-        sign_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("ALIGN",(0,0),(0,0),"LEFT"),("ALIGN",(1,0),(1,0),"RIGHT"),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),]))
+        sign_table = Table([
+            [Image(sig_img,width=150,height=50), Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]
+        ], colWidths=[0.5*inner_width, 0.5*inner_width])
+        sign_table.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+            ("ALIGN",(0,0),(0,0),"LEFT"),
+            ("ALIGN",(1,0),(1,0),"RIGHT"),
+            ("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("FONTSIZE",(0,0),(-1,-1),8)
+        ]))
         elements.append(sign_table)
 
+        # outer frame
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
-        outer_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.75,colors.black),("VALIGN",(0,0),(-1,-1),"TOP"),]))
+        outer_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),0.75,colors.black),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+        ]))
 
         doc.build([outer_table])
 
