@@ -1,4 +1,4 @@
-# proforma_v12.9.3_shift_currency_and_breaks.py
+# proforma_v12.9.3_currency_shift_4spacers_5breaks.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -268,35 +268,32 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # === NEW: Row4 right - add TWO line breaks and shift right by 7 spacer columns ===
-        currency_para = Paragraph("<br/><br/>CURRENCY: USD", row1_normal)
+        # === NEW: Row4 right - add FIVE line breaks and shift right by 4 spacer columns ===
+        currency_para = Paragraph("<br/><br/><br/><br/><br/>CURRENCY: USD", row1_normal)
 
-        # Create 7 spacer columns + 1 column for the currency itself.
-        # We'll make each spacer a small fraction of right_width so currency ends up far right.
-        # If you want it further right/left, adjust spacer_fraction below.
-        spacer_fraction = 0.065  # fraction of right_width to use per spacer column
-        spacer_w = max(8, right_width * spacer_fraction)  # minimal width to avoid collapse
-        # ensure last column gets remaining width
-        last_col_w = max(40, right_width - (spacer_w * 7))
+        # Create 4 spacer columns + 1 column for the currency itself.
+        spacer_count = 4
+        spacer_fraction = 0.08  # fraction of right_width to use per spacer column
+        spacer_w = max(8, right_width * spacer_fraction)
+        last_col_w = max(40, right_width - (spacer_w * spacer_count))
 
-        currency_inner_cols = [spacer_w] * 7 + [last_col_w]
-        # Build a single-row inner table with 8 columns: first 7 empty, last contains currency
-        inner_row = [""] * 7 + [currency_para]
+        currency_inner_cols = [spacer_w] * spacer_count + [last_col_w]
+        inner_row = [""] * spacer_count + [currency_para]
         inner_currency = Table([inner_row], colWidths=currency_inner_cols, rowHeights=[28])
         inner_currency.setStyle(TableStyle([
-            ("ALIGN",(0,0),(6,0),"LEFT"),
-            ("ALIGN",(7,0),(7,0),"RIGHT"),
-            ("VALIGN",(0,0),(7,0),"BOTTOM"),
+            ("ALIGN",(0,0),(spacer_count-1,0),"LEFT"),
+            ("ALIGN",(spacer_count,0),(spacer_count,0),"RIGHT"),
+            ("VALIGN",(0,0),(spacer_count,0),"BOTTOM"),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
 
-        # wrap inner_currency in an outer cell to ensure bottom alignment
         right_row4_box = Table([[inner_currency]], colWidths=[right_width])
         right_row4_box.setStyle(TableStyle([
             ("VALIGN",(0,0),(0,0),"BOTTOM"),
+            ("ALIGN",(0,0),(0,0),"RIGHT"),
             ("LEFTPADDING",(0,0),(0,0),4),
             ("RIGHTPADDING",(0,0),(0,0),4),
             ("TOPPADDING",(0,0),(0,0),0),
