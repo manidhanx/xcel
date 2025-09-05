@@ -1,3 +1,4 @@
+# qtyfixed_v12.3.6_pure_reference.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -32,7 +33,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.3.5 Pure Reference)")
+st.title("📑 Proforma Invoice Generator (v12.3.6 Pure Reference)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -142,13 +143,14 @@ if agg_df is not None:
         small_bold=ParagraphStyle("small_bold",parent=normal,fontName="Helvetica-Bold",fontSize=8)
         label_small=ParagraphStyle("label_small",parent=normal,fontName="Helvetica-Bold",fontSize=6)
         value_small=ParagraphStyle("value_small",parent=normal,fontName="Helvetica",fontSize=6)
+        payment_header_style=ParagraphStyle("payment_header", parent=normal, fontName="Helvetica-Bold", fontSize=7)  # smaller single-line label
 
         elements=[]
         content_width = A4[0] - 110
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # proportions
+        # proportions (same as before)
         style_prop = 0.125
         item_prop = 0.185
         fabric_prop = 0.12
@@ -156,18 +158,26 @@ if agg_df is not None:
         left_width = table_width * (style_prop + item_prop + fabric_prop)
         right_width = inner_width - left_width
 
-        # supplier inner columns
+        # compute offset so payment answers start at ORIGIN column left edge
+        # ORIGIN is column index 5 (0-based): widths before ORIGIN = style_prop + item_prop + fabric_prop + 0.10 + 0.15
+        before_origin_prop = style_prop + item_prop + fabric_prop + 0.10 + 0.15
+        origin_left_absolute = table_width * before_origin_prop  # absolute distance from left edge of table area
+        # Right column starts at left_width; so indent inside right column to reach origin left is:
+        indent_inside_right = origin_left_absolute - left_width
+        if indent_inside_right < 0: indent_inside_right = 0  # safety
+
+        # small guard: if indent is too wide, cap it so layout doesn't break (shouldn't happen with our props)
+        if indent_inside_right > (right_width * 0.9):
+            indent_inside_right = right_width * 0.6
+
+        # supplier inner columns (labels + values aligned to item description start)
         style_col_width = table_width * style_prop
         supplier_inner_col2 = left_width - style_col_width
 
-        # --- Build header_section with required row order:
-        # row0: title (spans both)
-        # row1: supplier (left) | empty (right)
-        # row2: consignee (left) | payment_terms (right)  <-- begin same row
-        # row3: shipment (span right or split)  (kept split to meet divider)
+        # --- Header rows construction ---
         title_para = Paragraph("<b>PROFORMA INVOICE</b>", ParagraphStyle("title", parent=normal, alignment=1, fontSize=7))
 
-        # Supplier block: single-line "Supplier Name:" + company on same line (attempt to keep single line)
+        # Supplier block - keep supplier name and company on same row (company next cell) to avoid wrapping
         supplier_lines = [
             [Paragraph("Supplier Name:", label_small), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],
             [Paragraph("Address:", label_small), Paragraph("6, Picaso Bithi, Kolkata - 700017", value_small)],
@@ -183,63 +193,52 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),1),
         ]))
         supplier_box = Table([[supplier_inner]], colWidths=[left_width])
-        supplier_box.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),0),
-            ("TOPPADDING",(0,0),(-1,-1),0),
-            ("BOTTOMPADDING",(0,0),(-1,-1),0),
-        ]))
+        supplier_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),
+                                          ("RIGHTPADDING",(0,0),(-1,-1),0),
+                                          ("TOPPADDING",(0,0),(-1,-1),0),
+                                          ("BOTTOMPADDING",(0,0),(-1,-1),0),]))
 
-        # Consignee block (left, row2)
+        # Consignee (left, row2)
         consignee_lines = f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}"
         consignee_para = Paragraph(consignee_lines, normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
-        consignee_box.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),2),
-            ("RIGHTPADDING",(0,0),(-1,-1),2),
-            ("TOPPADDING",(0,0),(-1,-1),4),
-            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),
+                                          ("RIGHTPADDING",(0,0),(-1,-1),2),
+                                          ("TOPPADDING",(0,0),(-1,-1),4),
+                                          ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        # Payment Terms block (right, row2) — with two blank lines after "Payment Term:" then bank details
-        # We'll put labels on left, answers on right; answers start at left edge of right column (i.e. HS NO start)
-        bank_labels = [
-            "Beneficiary :-",
-            "Account No :-",
-            "BANK'S NAME :-",
-            "BANK ADDRESS :-",
-            "",  # for address continuation
-            "SWIFT CODE :-",
-            "BANK CODE :-"
-        ]
-        bank_values = [
-            "SAR APPARELS INDIA PVT.LTD",
-            "2112819952",
-            "KOTAK MAHINDRA BANK LTD",
-            "2 BRABOURNE ROAD, GOVIND BHAVAN, GROUND FLOOR, KOLKATA-700001",
-            "",  # address continuation empty row (keeps formatting)
-            "KKBKINBBCPC",
-            "0323"
-        ]
+        # Payment Terms block (right, row2)
+        # Build as three-column inner table: [label_col | indent spacer | value_col]
+        # The indent spacer pushes the value column to align with ORIGIN column left edge.
+        label_col_w = table_width * 0.08  # give labels breathing room so they don't wrap
+        spacer_w = indent_inside_right
+        value_col_w = right_width - label_col_w - spacer_w - 6  # sub a small safety margin
 
-        # Build inner bank table with small label column and a value column that begins at HS NO (i.e., left edge of right column)
-        label_col_w = table_width * 0.08   # narrow label column inside payment box
-        value_col_w = right_width - label_col_w - 6  # remaining space; small correction to avoid overflow
+        # Make sure value_col_w stays positive
+        if value_col_w < 50:
+            value_col_w = max(50, right_width - label_col_w - 6)
+            spacer_w = right_width - label_col_w - value_col_w - 6
 
-        # Payment header + two blank lines
-        payment_header = Paragraph("<b>Payment Term:</b>", normal)
-        blank_para = Paragraph("<br/>", normal)
-
+        # Payment header (single small line) + two blank lines after it
         bank_rows = []
-        bank_rows.append([payment_header, ""])   # Payment Term: (we leave second cell blank)
-        bank_rows.append([blank_para, ""])       # blank line 1
-        bank_rows.append([blank_para, ""])       # blank line 2
+        bank_rows.append([Paragraph("Payment Term:", payment_header_style), "", ""])  # header (single-line)
+        bank_rows.append(["", "", ""])  # blank line 1
+        bank_rows.append(["", "", ""])  # blank line 2
 
-        # then bank detail rows with labels and values (answers left aligned at start of value_col)
-        for lbl, val in zip(bank_labels, bank_values):
-            bank_rows.append([Paragraph(lbl, label_small), Paragraph(val, value_small)])
+        # Now bank labels and answers (labels in col0; answers placed in col2 so they begin at ORIGIN left edge)
+        bank_pairs = [
+            ("Beneficiary :-", "SAR APPARELS INDIA PVT.LTD"),
+            ("Account No :-", "2112819952"),
+            ("BANK'S NAME :-", "KOTAK MAHINDRA BANK LTD"),
+            ("BANK ADDRESS :-", "2 BRABOURNE ROAD, GOVIND BHAVAN, GROUND FLOOR, KOLKATA-700001"),
+            ("SWIFT CODE :-", "KKBKINBBCPC"),
+            ("BANK CODE :-", "0323")
+        ]
+        for lbl, val in bank_pairs:
+            bank_rows.append([Paragraph(lbl, label_small), "", Paragraph(val, value_small)])
 
-        bank_inner = Table(bank_rows, colWidths=[label_col_w, value_col_w])
+        bank_inner = Table(bank_rows, colWidths=[label_col_w, spacer_w, value_col_w])
         bank_inner.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LEFTPADDING",(0,0),(-1,-1),2),
@@ -249,15 +248,13 @@ if agg_df is not None:
         ]))
 
         payment_box = Table([[bank_inner]], colWidths=[right_width])
-        # ensure no left padding so values start at HS NO left edge (the right column left edge)
-        payment_box.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),4),
-            ("TOPPADDING",(0,0),(-1,-1),2),
-            ("BOTTOMPADDING",(0,0),(-1,-1),2),
+        payment_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),
+                                         ("RIGHTPADDING",(0,0),(-1,-1),4),
+                                         ("TOPPADDING",(0,0),(-1,-1),2),
+                                         ("BOTTOMPADDING",(0,0),(-1,-1),2),
         ]))
 
-        # Shipment row (row3) - keep split so divider meets items table
+        # Shipment row - keep right and left side split so divider meets table
         shipment_para_left = Paragraph(f"<b>Loading Country:</b> {made_in}<br/><b>Agreed Shipment Date:</b> {ship_date}", normal)
         shipment_para_right = Paragraph(f"<b>Port of Loading:</b> {loading_port}<br/><b>Description of goods:</b> {order_of}", normal)
         shipment_left_box = Table([[shipment_para_left]], colWidths=[left_width])
@@ -265,7 +262,11 @@ if agg_df is not None:
         shipment_left_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
         shipment_right_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
 
-        # Compose header_section with exact requested ordering
+        # Compose header_section rows:
+        # row0: title (spans both)
+        # row1: supplier (left) | empty (right)        -> preserves vertical alignment
+        # row2: consignee (left) | payment_box (right) -> both begin same row
+        # row3: shipment_left | shipment_right         -> divider continues through
         header_section = Table([
             [Paragraph("<b>PROFORMA INVOICE</b>", ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)), ""],
             [supplier_box, ""],
@@ -276,8 +277,9 @@ if agg_df is not None:
         header_section.setStyle(TableStyle([
             ("SPAN",(0,0),(1,0)),                  # title spans across top
             ("ALIGN",(0,0),(1,0),"CENTER"),
-            ("LINEBELOW",(0,0),(1,0),0.75,colors.black),  # horizontal rule under title (divider starts here)
+            ("LINEBELOW",(0,0),(1,0),0.75,colors.black),  # horizontal rule under title
             ("LINEAFTER",(0,1),(0,3),0.75,colors.black),  # vertical divider through rows 1..3
+            ("LINEBELOW",(0,3),(1,3),0.5,colors.black),   # small horizontal line at bottom of header to anchor divider
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),
@@ -285,7 +287,7 @@ if agg_df is not None:
         ]))
 
         elements.append(header_section)
-        elements.append(Spacer(1,8))
+        elements.append(Spacer(1,6))  # small gap before items (divider now anchored to bottom of header)
 
         # --- Main Items Table ---
         data=[list(agg_df.columns)]
