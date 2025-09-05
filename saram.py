@@ -1,3 +1,4 @@
+# proforma_v12.4.7.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.4.6)")
+st.title("📑 Proforma Invoice Generator (v12.4.7)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -138,13 +139,13 @@ if agg_df is not None:
         styles=getSampleStyleSheet()
         normal=styles["Normal"]
 
-        # row1 fonts: slightly reduced supplier font so company fits single line
+        # fonts/styles
         supplier_label_bold = ParagraphStyle("supplier_label_bold", parent=normal, fontName="Helvetica-Bold", fontSize=6)
         supplier_value_bold = ParagraphStyle("supplier_value_bold", parent=normal, fontName="Helvetica-Bold", fontSize=6)
         supplier_label_normal = ParagraphStyle("supplier_label_normal", parent=normal, fontName="Helvetica", fontSize=6)
 
-        # PI top font small so it fits in tiny top box
-        pi_top_style = ParagraphStyle("pi_top", parent=normal, fontName="Helvetica", fontSize=7, leading=7)
+        # PI tiny style to fit into very small top box
+        pi_top_style = ParagraphStyle("pi_top", parent=normal, fontName="Helvetica", fontSize=5, leading=5)
 
         payment_header_style=ParagraphStyle("payment_header", parent=normal, fontName="Helvetica-Bold", fontSize=7)
         label_small=ParagraphStyle("label_small", parent=normal, fontName="Helvetica-Bold", fontSize=6)
@@ -171,7 +172,7 @@ if agg_df is not None:
         if indent_inside_right > (right_width * 0.9):
             indent_inside_right = right_width * 0.6
 
-        # ----------------- Header (title + 4-row header) -----------------
+        # ----------------- Header title -----------------
         title_para = Paragraph("<b>PROFORMA INVOICE</b>", ParagraphStyle("title", parent=normal, alignment=1, fontSize=7))
         elements.append(Table([[title_para]], colWidths=[content_width], style=[
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
@@ -179,8 +180,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        # ---------------- ROW 1 (supplier left flush; right split) ----------------
-        # Supplier: first two lines full-width so company doesn't wrap; rest as two-col lines
+        # ---------------- ROW 1 (supplier left, right split) ----------------
         supplier_lines = [
             [Paragraph("Supplier Name:", supplier_label_bold)],
             [Paragraph("SAR APPARELS INDIA PVT.LTD.", supplier_value_bold)],
@@ -188,8 +188,6 @@ if agg_df is not None:
             [Paragraph("Phone:", supplier_label_normal), Paragraph("9817473373", supplier_value_bold)],
             [Paragraph("Fax:", supplier_label_normal), Paragraph("N.A.", supplier_value_bold)]
         ]
-        # row colWidths: first two rows will just use the first element full width, but Table expects a consistent column count.
-        # So we create the supplier_inner with two columns and put full-width entries in column 0 and blank in column1.
         supplier_inner = Table([
             [supplier_lines[0][0], ""],
             [supplier_lines[1][0], ""],
@@ -206,18 +204,18 @@ if agg_df is not None:
         ]))
         supplier_box = Table([[supplier_inner]], colWidths=[left_width])
 
-        # RIGHT TOP: very small height (6 pts) and top-aligned; PI text font smaller so it fits
-        right_top_height = 6
+        # RIGHT TOP: extremely small height (half of previous small value) — 4 pts — with tiny font (5)
+        right_top_height = 4
         pi_text = "<b>No. & date of PI:</b> " + str(pi_no)
         right_top_para = Paragraph(pi_text, pi_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width], rowHeights=[right_top_height])
         right_top.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),4),
-            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("LEFTPADDING",(0,0),(-1,-1),2),
+            ("RIGHTPADDING",(0,0),(-1,-1),2),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
         ]))
 
-        # RIGHT BOTTOM: occupies the rest
+        # RIGHT BOTTOM (rest)
         right_bottom_text = (
             f"<b>Landmark order Reference:</b> {order_no}<br/>"
             f"<b>Buyer Name:</b> {buyer_name}<br/>"
@@ -240,7 +238,7 @@ if agg_df is not None:
             ("RIGHTPADDING",(0,0),(-1,-1),0),
         ]))
 
-        # ---------------- ROW 2 (Consignee left, Payment terms right) ----------------
+        # ROW 2: Consignee left, Payment right
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([
@@ -250,7 +248,6 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        # payment block (labels + spacer + values) — same logic as earlier
         label_col_w = table_width * 0.08
         spacer_w = indent_inside_right
         value_col_w = right_width - label_col_w - spacer_w - 6
@@ -289,7 +286,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),2),
         ]))
 
-        # ---------------- ROW 3 & 4 (unchanged) ----------------
+        # ROW 3 & 4 (unchanged)
         left_row3_para = Paragraph(
             f"<b>Loading Country:</b> {made_in or ''}<br/>"
             f"<b>Port of Loading:</b> {loading_port or ''}<br/>"
@@ -314,7 +311,7 @@ if agg_df is not None:
         right_row4_box = Table([[right_row4_para]], colWidths=[right_width])
         right_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
 
-        # assemble header (4 rows)
+        # assemble header table
         header_table = Table([
             [supplier_box, right_stack],
             [consignee_box, payment_box],
@@ -376,7 +373,7 @@ if agg_df is not None:
         table.setStyle(style)
         elements.append(table)
 
-        # ---------------- Footer & signature ----------------
+        # footer & signature
         amount_words=amount_to_words(total_amount)
         words_table=Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]],colWidths=[inner_width])
         words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
