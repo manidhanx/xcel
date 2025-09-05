@@ -1,4 +1,4 @@
-# proforma_v12.9.3_row4right_restart.py
+# proforma_v12.9.3_currency_flush_right.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -201,11 +201,11 @@ if agg_df is not None:
         # right top (No. & date)
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
-        right_top.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),3),("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP"),("LINEBELOW",(0,0),(0,0),0.6,colors.black)]))
+        right_top.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP"),("LINEBELOW",(0,0),(0,0),0.6,colors.black)]))
 
         right_bottom_para = Paragraph(f"<b>Landmark order Reference:</b> {order_no}<br/><b>Buyer Name:</b> {buyer_name}<br/><b>Brand Name:</b> {brand_name}", right_block_style)
         right_bottom = Table([[right_bottom_para]], colWidths=[right_width])
-        right_bottom.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),3),("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        right_bottom.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
         right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width])
         right_stack.setStyle(TableStyle([("VALIGN",(0,0),(0,1),"TOP"),("LEFTPADDING",(0,0),(0,1),2),("RIGHTPADDING",(0,0),(0,1),0)]))
@@ -248,7 +248,7 @@ if agg_df is not None:
         bank_inner.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
 
         payment_block = Table([[pay_term_tbl],[blank_row],[bank_heading_tbl],[bank_inner]], colWidths=[right_width])
-        payment_block.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),2),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
+        payment_block.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
 
         # ROW3 & ROW4
         left_row3_para = Paragraph(f"<b>Loading Country:</b> {made_in or ''}<br/><b>Port of Loading:</b> {loading_port or ''}<br/><b>Agreed Shipment Date:</b> {ship_date or ''}", row1_normal)
@@ -267,19 +267,16 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # ----------------- RESTARTED ROW 4 RIGHT (clean & robust) -----------------
-        # Single Paragraph: "CURRENCY: USD" placed at bottom-right of this block.
+        # ----------------- ROW 4 RIGHT: flush-right currency -----------------
         currency_para = Paragraph("CURRENCY: USD", row1_normal)
-
-        # set a fixed row4 height (tweak row4_height if you want it lower/higher)
         row4_height = 56
 
         right_row4_box = Table([[currency_para]], colWidths=[right_width], rowHeights=[row4_height])
         right_row4_box.setStyle(TableStyle([
-            ("ALIGN",(0,0),(0,0),"RIGHT"),    # right align the content
-            ("VALIGN",(0,0),(0,0),"BOTTOM"),  # bottom align the content
-            ("LEFTPADDING",(0,0),(0,0),4),
-            ("RIGHTPADDING",(0,0),(0,0),4),
+            ("ALIGN",(0,0),(0,0),"RIGHT"),     # push to right edge of this cell
+            ("VALIGN",(0,0),(0,0),"BOTTOM"),   # bottom align inside the cell
+            ("LEFTPADDING",(0,0),(0,0),2),     # tiny left padding so text doesn't touch border
+            ("RIGHTPADDING",(0,0),(0,0),0),    # zero right padding to bring it flush
             ("TOPPADDING",(0,0),(0,0),0),
             ("BOTTOMPADDING",(0,0),(0,0),2),
         ]))
@@ -300,7 +297,7 @@ if agg_df is not None:
             ("LINEBELOW",(0,2),(1,2),0.35,colors.black),
             ("LINEBELOW",(0,3),(1,3),0.9,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),  # header table itself has zero right padding
             ("TOPPADDING",(0,0),(-1,-1),2),
             ("BOTTOMPADDING",(0,0),(-1,-1),2),
         ]))
@@ -397,7 +394,12 @@ if agg_df is not None:
         elements.append(sign_table)
 
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
-        outer_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.75,colors.black),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0)]))
+        outer_table.setStyle(TableStyle([
+            ("GRID",(0,0),(-1,-1),0.75,colors.black),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),  # ensure outer frame has zero right padding
+        ]))
 
         doc.build([outer_table])
 
