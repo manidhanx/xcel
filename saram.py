@@ -1,4 +1,4 @@
-# proforma_v12.9.3_currency_flush_right.py
+# proforma_v12.9.3_totals_spans_and_underlined_headers.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -267,20 +267,18 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # ----------------- ROW 4 RIGHT: flush-right currency -----------------
+        # ROW4 right: currency bottom-right
         currency_para = Paragraph("CURRENCY: USD", row1_normal)
         row4_height = 56
-
         right_row4_box = Table([[currency_para]], colWidths=[right_width], rowHeights=[row4_height])
         right_row4_box.setStyle(TableStyle([
-            ("ALIGN",(0,0),(0,0),"RIGHT"),     # push to right edge of this cell
-            ("VALIGN",(0,0),(0,0),"BOTTOM"),   # bottom align inside the cell
-            ("LEFTPADDING",(0,0),(0,0),2),     # tiny left padding so text doesn't touch border
-            ("RIGHTPADDING",(0,0),(0,0),0),    # zero right padding to bring it flush
+            ("ALIGN",(0,0),(0,0),"RIGHT"),
+            ("VALIGN",(0,0),(0,0),"BOTTOM"),
+            ("LEFTPADDING",(0,0),(0,0),2),
+            ("RIGHTPADDING",(0,0),(0,0),0),
             ("TOPPADDING",(0,0),(0,0),0),
             ("BOTTOMPADDING",(0,0),(0,0),2),
         ]))
-        # -------------------------------------------------------------------------
 
         header_table = Table([
             [supplier_stack, right_stack],
@@ -297,14 +295,14 @@ if agg_df is not None:
             ("LINEBELOW",(0,2),(1,2),0.35,colors.black),
             ("LINEBELOW",(0,3),(1,3),0.9,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),0),  # header table itself has zero right padding
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),2),
             ("BOTTOMPADDING",(0,0),(-1,-1),2),
         ]))
 
         elements.append(header_table)
 
-        # items table
+        # ---------------------- ITEMS / STYLE TABLE ----------------------
         header_labels = [
             "STYLE NO.",
             "ITEM DESCRIPTION",
@@ -321,8 +319,10 @@ if agg_df is not None:
         header_row = [Paragraph(lbl, header_par_style) for lbl in header_labels]
 
         body_rows = [list(row) for _, row in agg_df.iterrows()]
-        total_row = ["TOTAL","","","","","",f"{int(agg_df['QTY'].sum()):,}","USD",f"{agg_df['AMOUNT'].astype(float).sum():,.2f}"]
+        total_qty = agg_df["QTY"].sum()
+        total_amount = agg_df["AMOUNT"].astype(float).sum()
 
+        # ensure there are a fixed number of body rows (you asked for earlier)
         EXTRA_BLANK_ROWS = 10
         actual_body_count = len(body_rows)
         body_count = actual_body_count + EXTRA_BLANK_ROWS
@@ -332,47 +332,95 @@ if agg_df is not None:
             for _ in range(body_count - actual_body_count):
                 body_rows.append(empty_row.copy())
 
-        data = [header_row] + body_rows + [total_row]
+        # Build data: header + body + total row (we will make spans on the total row)
+        data = [header_row] + body_rows
 
+        # Prepare the total row content (we'll place values only in the positions that will remain after spanning)
+        # After spans we want:
+        #  - (0..5) merged -> cell (0) will contain "TOTAL" centered
+        #  - (6) will contain total_qty
+        #  - (7..8) merged -> cell (7) will contain "USD <total_amount>"
+        total_row = ["TOTAL", "", "", "", "", "", f"{int(total_qty):,}", None, None]
+        data.append(total_row)
+
+        # row_heights: header + body_count rows + total row
         header_row_height = 40
         body_row_height = 12
         total_row_height = 16
         row_heights = [header_row_height] + [body_row_height] * body_count + [total_row_height]
 
-        body_font_size = 7
-
+        # create table
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
 
+        # base style
         items_style = TableStyle([
-            ("GRID",(0,1),(-1,-1),0.25,colors.black),
-            ("LINEBELOW",(0,0),(-1,0),0.35,colors.black),
+            ("GRID",(0,1),(-1,-2),0.25,colors.black),  # grid for body
+            ("LINEBELOW",(0,0),(-1,0),0.5,colors.black),    # underline header (visible)
             ("BACKGROUND",(0,0),(-1,0),colors.white),
             ("TEXTCOLOR",(0,0),(-1,0),colors.black),
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
             ("FONTSIZE",(0,0),(-1,0),6.5),
-            ("FONTSIZE",(0,1),(-1,-1),body_font_size),
+            ("FONTSIZE",(0,1),(-1,-1),7),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
             ("LEFTPADDING",(0,0),(-1,-1),3),
             ("RIGHTPADDING",(0,0),(-1,-1),3),
         ])
 
-        items_style.add("LINEBELOW",(0,1),(-1,-2),0.25,colors.white)
-        items_style.add("LINEBELOW",(0, len(data)-2),(-1, len(data)-2),0.35,colors.black)
-        items_style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.white)
-        items_style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
-        items_style.add("LINEABOVE",(0,len(data)-1),(-1,len(data)-1),0.35,colors.black)
-
+        # Make header cell underlines explicitly per column (reinforce)
         ncols = len(col_widths)
-        for col_idx in range(ncols - 1):
-            items_style.add("LINEAFTER",(col_idx,0),(col_idx,0),0.25,colors.black)
+        for c in range(ncols):
+            items_style.add("LINEBELOW",(c,0),(c,0),0.5,colors.black)
 
+        # Now add spans for the total row. index of total row:
+        total_row_idx = len(data) - 1
+
+        # Span columns 0..5 into one cell for TOTAL label
+        items_style.add("SPAN",(0,total_row_idx),(5,total_row_idx))
+        items_style.add("ALIGN",(0,total_row_idx),(5,total_row_idx),"CENTER")
+        items_style.add("FONTNAME",(0,total_row_idx),(5,total_row_idx),"Helvetica-Bold")
+        items_style.add("FONTSIZE",(0,total_row_idx),(5,total_row_idx),8)
+        items_style.add("VALIGN",(0,total_row_idx),(5,total_row_idx),"MIDDLE")
+
+        # Column 6 stays with quantity; center it vertically & horizontally
+        items_style.add("ALIGN",(6,total_row_idx),(6,total_row_idx),"CENTER")
+        items_style.add("FONTNAME",(6,total_row_idx),(6,total_row_idx),"Helvetica-Bold")
+        items_style.add("FONTSIZE",(6,total_row_idx),(6,total_row_idx),7)
+
+        # Merge the last two columns (7..8) to show USD total
+        items_style.add("SPAN",(7,total_row_idx),(8,total_row_idx))
+        items_style.add("ALIGN",(7,total_row_idx),(8,total_row_idx),"RIGHT")
+        items_style.add("FONTNAME",(7,total_row_idx),(8,total_row_idx),"Helvetica-Bold")
+        items_style.add("FONTSIZE",(7,total_row_idx),(8,total_row_idx),7)
+        # put a cell above the merged cells so they show a top border (line above)
+        items_style.add("LINEABOVE",(7,total_row_idx),(8,total_row_idx),0.5,colors.black)
+
+        # ensure the top of the body (line under header) is black:
+        items_style.add("LINEBELOW",(0,1),(-1,1),0.25,colors.black)
+
+        # Remove internal horizontal lines between header and first body row except the top underline already set:
+        # (we previously set grid for body from row1 onwards; keep that)
+
+        items_table.setStyle(items_style)
+
+        # After styling, we need to place the actual USD total string into the merged cell (7, total_row_idx)
+        # ReportLab Table expects the data list to hold that value in the first cell of the span.
+        usd_total_str = f"USD {total_amount:,.2f}"
+        # place the USD string into column 7 (first cell of the span)
+        data[total_row_idx][7] = usd_total_str
+        # ensure column 8 is empty (since spanned)
+        data[total_row_idx][8] = ""
+
+        # place the "TOTAL" label (we already put it in data[total_row_idx][0])
+        data[total_row_idx][0] = "TOTAL"
+
+        # reassign items_table data (ReportLab is fine with updating ._cellvalues, but safer to recreate the Table)
+        items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
         items_table.setStyle(items_style)
 
         elements.append(items_table)
 
         # amount words, terms & signature
-        total_amount = agg_df["AMOUNT"].astype(float).sum()
         amount_words = amount_to_words(total_amount)
         words_table = Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]], colWidths=[available_width])
         words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
@@ -398,7 +446,7 @@ if agg_df is not None:
             ("GRID",(0,0),(-1,-1),0.75,colors.black),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),0),  # ensure outer frame has zero right padding
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
         ]))
 
         doc.build([outer_table])
