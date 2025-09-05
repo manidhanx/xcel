@@ -1,4 +1,4 @@
-# proforma_v12.9.3_currency_shift_14spacers_15breaks.py
+# proforma_v12.9.3_row4right_restart.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -166,7 +166,7 @@ if agg_df is not None:
         left_width = sum(col_widths[:3])
         right_width = available_width - left_width
 
-        # spacer calculation for bank block alignment (keeps existing logic)
+        # spacer calculation kept for bank alignment (unchanged)
         origin_left_absolute = sum(col_widths[:5])
         indent_inside_right = origin_left_absolute - left_width
         items_cell_left_padding = 4
@@ -256,7 +256,7 @@ if agg_df is not None:
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
         right_row3_para = Paragraph(
-            f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/>"
+            f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/>"
             f"<b>Remarks:</b> (if any)",
             row1_normal
         )
@@ -267,45 +267,30 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # === FINAL: Row4 right - add FIFTEEN line breaks and shift right by 14 spacer columns ===
-        br_count = 15
-        currency_para = Paragraph("<br/>" * br_count + "CURRENCY: USD", row1_normal)
+        # ----------------- RESTARTED ROW 4 RIGHT (clean & robust) -----------------
+        # Single Paragraph: "CURRENCY: USD" placed at bottom-right of this block.
+        currency_para = Paragraph("CURRENCY: USD", row1_normal)
 
-        spacer_count = 14
-        spacer_fraction = 0.055  # fraction of right_width to use per spacer column
-        spacer_w = max(5, right_width * spacer_fraction)
-        last_col_w = max(40, right_width - (spacer_w * spacer_count))
+        # set a fixed row4 height (tweak row4_height if you want it lower/higher)
+        row4_height = 56
 
-        currency_inner_cols = [spacer_w] * spacer_count + [last_col_w]
-        inner_row = [""] * spacer_count + [currency_para]
-        inner_currency = Table([inner_row], colWidths=currency_inner_cols, rowHeights=[28])
-        inner_currency.setStyle(TableStyle([
-            ("ALIGN",(0,0),(spacer_count-1,0),"LEFT"),
-            ("ALIGN",(spacer_count,0),(spacer_count,0),"RIGHT"),
-            ("VALIGN",(0,0),(spacer_count,0),"BOTTOM"),
-            ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),0),
-            ("TOPPADDING",(0,0),(-1,-1),0),
-            ("BOTTOMPADDING",(0,0),(-1,-1),0),
-        ]))
-
-        right_row4_box = Table([[inner_currency]], colWidths=[right_width])
+        right_row4_box = Table([[currency_para]], colWidths=[right_width], rowHeights=[row4_height])
         right_row4_box.setStyle(TableStyle([
-            ("VALIGN",(0,0),(0,0),"BOTTOM"),
-            ("ALIGN",(0,0),(0,0),"RIGHT"),
+            ("ALIGN",(0,0),(0,0),"RIGHT"),    # right align the content
+            ("VALIGN",(0,0),(0,0),"BOTTOM"),  # bottom align the content
             ("LEFTPADDING",(0,0),(0,0),4),
             ("RIGHTPADDING",(0,0),(0,0),4),
             ("TOPPADDING",(0,0),(0,0),0),
             ("BOTTOMPADDING",(0,0),(0,0),2),
         ]))
-        # ======================================================================
+        # -------------------------------------------------------------------------
 
         header_table = Table([
             [supplier_stack, right_stack],
             [consignee_box, payment_block],
             [left_row3_box, right_row3_box],
             [left_row4_box, right_row4_box]
-        ], colWidths=[left_width, right_width], rowHeights=[None, None, 56, 56])
+        ], colWidths=[left_width, right_width], rowHeights=[None, None, 56, row4_height])
 
         header_table.setStyle(TableStyle([
             ("VALIGN",(0,0),(1,3),"TOP"),
@@ -322,7 +307,7 @@ if agg_df is not None:
 
         elements.append(header_table)
 
-        # ---------------------- ITEMS / STYLE TABLE ----------------------
+        # items table
         header_labels = [
             "STYLE NO.",
             "ITEM DESCRIPTION",
@@ -363,7 +348,7 @@ if agg_df is not None:
 
         items_style = TableStyle([
             ("GRID",(0,1),(-1,-1),0.25,colors.black),
-            ("LINEBELOW",(0,0),(-1,0),0.35,colors.black),    # header underline
+            ("LINEBELOW",(0,0),(-1,0),0.35,colors.black),
             ("BACKGROUND",(0,0),(-1,0),colors.white),
             ("TEXTCOLOR",(0,0),(-1,0),colors.black),
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
@@ -377,7 +362,6 @@ if agg_df is not None:
 
         items_style.add("LINEBELOW",(0,1),(-1,-2),0.25,colors.white)
         items_style.add("LINEBELOW",(0, len(data)-2),(-1, len(data)-2),0.35,colors.black)
-
         items_style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.white)
         items_style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
         items_style.add("LINEABOVE",(0,len(data)-1),(-1,len(data)-1),0.35,colors.black)
