@@ -1,4 +1,4 @@
-# proforma_v12.9.3_final_tweaks_v2.py
+# proforma_v12.9.3_final_tweaks_v3.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -150,17 +150,17 @@ if agg_df is not None:
         label_small=ParagraphStyle("label_small", parent=normal, fontName="Helvetica-Bold", fontSize=7)
         value_small=ParagraphStyle("value_small", parent=normal, fontName="Helvetica", fontSize=7, leading=8)
 
-        # amount-in-words style increased by 25% (6 -> 7.5)
+        # amount-in-words style (7.5 from previous adjustment)
         amount_words_style = ParagraphStyle(
             "amount_words_style",
             parent=normal,
             fontName="Helvetica-Bold",
-            fontSize=7.5,   # increased 25% from 6
+            fontSize=7.5,
             leading=8.5,
             alignment=0
         )
 
-        # terms style reduced by 25% (8 -> 6)
+        # terms style reduced (6pt)
         terms_small = ParagraphStyle("terms_small", parent=normal, fontName="Helvetica", fontSize=6, leading=7)
 
         # footer small styles
@@ -191,12 +191,15 @@ if agg_df is not None:
         extra_left_shift = col_widths[6] * 3
         spacer_to_origin = max(0, indent_inside_right_corrected - extra_left_shift)
 
-        # --- Header / blocks ---
-        elements.append(Table([[Paragraph("PROFORMA INVOICE", title_style)]], colWidths=[available_width], style=[
+        # --- Title with BLACK line below it (a) ---
+        title_tbl = Table([[Paragraph("PROFORMA INVOICE", title_style)]], colWidths=[available_width])
+        title_tbl.setStyle(TableStyle([
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("TOPPADDING",(0,0),(-1,-1),4),
-            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),2),
+            ("LINEBELOW",(0,0),(-1,-1),0.6,colors.black),  # <- black line under title
         ]))
+        elements.append(title_tbl)
 
         # supplier stack (left)
         supplier_title = Table([
@@ -296,6 +299,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(0,0),2),
         ]))
 
+        # Assemble header table and remove bottom padding on last header row to eliminate gap (c)
         header_table = Table([
             [supplier_stack, right_stack],
             [consignee_box, payment_block],
@@ -312,11 +316,14 @@ if agg_df is not None:
             ("LINEBELOW",(0,3),(1,3),0.9,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
-            ("TOPPADDING",(0,0),(-1,-1),2),
-            ("BOTTOMPADDING",(0,0),(-1,-1),2),
+            ("TOPPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),0),
+            # remove extra bottom padding specifically on the bottom-most row to eliminate gap
+            ("BOTTOMPADDING",(0,3),(1,3),0),
         ]))
 
         elements.append(header_table)
+        # no spacer — header bottom line is the top border of the items table (gap eliminated)
 
         # ---------------------- ITEMS / STYLE TABLE ----------------------
         header_labels = [
@@ -414,7 +421,7 @@ if agg_df is not None:
 
         # make a clear horizontal line above the total row (black)
         items_style.add("LINEABOVE",(0,total_row_idx),(-1,total_row_idx),0.5,colors.black)
-        # **new**: make the horizontal line immediately BELOW the total row black as requested
+        # make the horizontal line immediately BELOW the total row black as requested earlier
         items_style.add("LINEBELOW",(0,total_row_idx),(-1,total_row_idx),0.5,colors.black)
 
         # ensure vertical black separators after col4 and after col6 in total row
@@ -443,7 +450,7 @@ if agg_df is not None:
 
         elements.append(items_table)
 
-        # ------------------ AMOUNT IN WORDS (increased 25% -> 7.5) ---------------
+        # ------------------ AMOUNT IN WORDS (kept at 7.5pt) ---------------
         amount_words = amount_to_words(total_amount)
         words_para = Paragraph(f"<b>TOTAL&nbsp;&nbsp;&nbsp;US DOLLAR {amount_words}</b>", amount_words_style)
         # Hide inner grid lines beneath words block (so rows below appear white) — outer frame kept below
@@ -456,7 +463,7 @@ if agg_df is not None:
         elements.append(words_table)
         # -----------------------------------------------------------------------------------------
 
-        # Terms block (reduced by 25%)
+        # Terms block (reduced)
         terms_para = Paragraph("Terms & Conditions (if any):", terms_small)
         terms_table = Table([[terms_para]], colWidths=[available_width])
         terms_table.setStyle(TableStyle([
@@ -466,9 +473,8 @@ if agg_df is not None:
         ]))
         elements.append(terms_table)
 
-        # one small line break spacer ABOVE signature (reduced from two to one)
-        elements.append(Spacer(1,12))
-
+        # -- removed one spacer ABOVE signature (b) --
+        # one small line break spacer BELOW signature (kept one)
         # ------------------ SIGN IMAGE (left aligned) ------------
         sig_img = "sarsign.png"
         try:
@@ -487,7 +493,7 @@ if agg_df is not None:
         ]))
         elements.append(sign_row)
 
-        # one small line break spacer BELOW signature (reduced from two to one)
+        # one small line break spacer BELOW signature (kept single)
         elements.append(Spacer(1,8))
 
         # f) & g) Footer bottom line: left signed text and right "for RNA..." text (smaller)
@@ -505,8 +511,7 @@ if agg_df is not None:
         ]))
         elements.append(footer_row)
 
-        # Outer frame: only outer BOX (inner rows below amount-in-words are white so appear removed,
-        # but we kept the LINEBELOW on total row to be black)
+        # Outer frame: keep outer BOX (inner divisions manipulated earlier)
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
         outer_table.setStyle(TableStyle([
             ("BOX",(0,0),(-1,-1),0.75,colors.black),
