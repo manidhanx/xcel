@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.3 Pure Reference)")
+st.title("📑 Proforma Invoice Generator (v12.3.1 Pure Reference)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -167,15 +167,18 @@ if agg_df is not None:
         left_width = table_width * (style_prop + item_prop + fabric_prop)   # left block width (same visual edge)
         right_width = inner_width - left_width
 
-        # For aligning address/phone/fax with ITEM DESCRIPTION start: create nested cols inside supplier block
+        # For aligning address/phone/fax values with ITEM DESCRIPTION start:
+        # create supplier inner table with two columns:
+        #   col0 = style_col_width (labels: "Supplier Name:", "Address:", "Phone:", "Fax:")
+        #   col1 = value column which starts where ITEM DESCRIPTION begins (i.e. supplier_inner_col2)
         style_col_width = table_width * style_prop
         supplier_inner_col2 = left_width - style_col_width
 
         supplier_lines = [
             [Paragraph("Supplier Name:", small_bold), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],
-            ["", Paragraph("Address: 6, Picaso Bithi, Kolkata - 700017", normal)],
-            ["", Paragraph("Phone: 9817473373", normal)],
-            ["", Paragraph("Fax: N.A.", normal)]
+            [Paragraph("Address:", small_bold), Paragraph("6, Picaso Bithi, Kolkata - 700017", normal)],
+            [Paragraph("Phone:", small_bold), Paragraph("9817473373", normal)],
+            [Paragraph("Fax:", small_bold), Paragraph("N.A.", normal)]
         ]
         supplier_inner = Table(supplier_lines, colWidths=[style_col_width, supplier_inner_col2])
         supplier_inner.setStyle(TableStyle([
@@ -193,7 +196,7 @@ if agg_df is not None:
         consignee_lines = f"Consignee:<br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}"
         consignee_para = Paragraph(consignee_lines, normal)
 
-        # Wrap supplier_inner into a single-cell table for consistent placement (no box)
+        # Wrap supplier_inner into a single-cell table for consistent placement (no visible box)
         supplier_box = Table([[supplier_inner]], colWidths=[left_width])
         supplier_box.setStyle(TableStyle([
             ("LEFTPADDING",(0,0),(-1,-1),0),
