@@ -1,4 +1,4 @@
-# proforma_v12.5.2.py
+# proforma_v12.6.0.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.5.2)")
+st.title("📑 Proforma Invoice Generator (v12.6.0)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -139,14 +139,15 @@ if agg_df is not None:
         styles=getSampleStyleSheet()
         normal=styles["Normal"]
 
-        # styles
+        # typography tweaks (company single-line uses smaller font so it fits)
         title_style = ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)
         supplier_label = ParagraphStyle("supplier_label", parent=normal, fontName="Helvetica-Bold", fontSize=8)
-        supplier_company = ParagraphStyle("supplier_company", parent=normal, fontName="Helvetica-Bold", fontSize=7)  # slightly smaller
-        supplier_value = ParagraphStyle("supplier_value", parent=normal, fontName="Helvetica-Bold", fontSize=8)
+        # single-line company (both parts same size, slightly smaller so single line fits)
+        supplier_company = ParagraphStyle("supplier_company", parent=normal, fontName="Helvetica-Bold", fontSize=7)
         supplier_small_label = ParagraphStyle("supplier_small_label", parent=normal, fontName="Helvetica", fontSize=6)
-        supplier_small_value = ParagraphStyle("supplier_small_value", parent=normal, fontName="Helvetica-Bold", fontSize=6)
+        supplier_small_value = ParagraphStyle("supplier_small_value", parent=normal, fontName="Helvetica", fontSize=6)
         right_block_style = ParagraphStyle("right_block", parent=normal, fontName="Helvetica", fontSize=8, leading=10)
+        right_top_style = ParagraphStyle("right_top", parent=normal, fontName="Helvetica-Bold", fontSize=8, leading=9)
 
         payment_header_style=ParagraphStyle("payment_header", parent=normal, fontName="Helvetica-Bold", fontSize=7)
         label_small=ParagraphStyle("label_small", parent=normal, fontName="Helvetica-Bold", fontSize=6)
@@ -181,26 +182,25 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        # ---------------- ROW 1 (LEFT) - supplier stack (single-col for title/company/pvt) ----------------
+        # ---------------- ROW 1 LEFT - single-line company ----------------
         supplier_title = Table([
             [Paragraph("Supplier Name:", supplier_label)],
-            [Paragraph("SAR APPARELS INDIA", supplier_company)],
-            [Paragraph("PVT.LTD.", supplier_value)]
+            [Paragraph("SAR APPARELS INDIA PVT.LTD.", supplier_company)]
         ], colWidths=[left_width])
         supplier_title.setStyle(TableStyle([
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),
-            ("BOTTOMPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),2),
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
 
-        # address/phone/fax as two-column table under the title stack
+        # contacts below (two-col)
         supplier_contact = Table([
             [Paragraph("Address:", supplier_small_label), Paragraph("6, Picaso Bithi, Kolkata - 700017", supplier_small_value)],
             [Paragraph("Phone:", supplier_small_label), Paragraph("9817473373", supplier_small_value)],
             [Paragraph("Fax:", supplier_small_label), Paragraph("N.A.", supplier_small_value)]
-        ], colWidths=[left_width*0.32, left_width*0.68])
+        ], colWidths=[left_width*0.30, left_width*0.70])
         supplier_contact.setStyle(TableStyle([
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),2),
@@ -209,34 +209,53 @@ if agg_df is not None:
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
 
-        # stack title + contact (full-width stack)
         supplier_stack = Table([[supplier_title],[supplier_contact]], colWidths=[left_width])
         supplier_stack.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
-            ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
 
-        # ---------------- ROW 1 (RIGHT) - single top-aligned block (no split) ----------------
-        right_block_text = (
-            f"<b>No. & date of PI:</b> {pi_no}<br/><br/>"
-            f"<b>Landmark order Reference:</b> {order_no}<br/>"
-            f"<b>Buyer Name:</b> {buyer_name}<br/>"
-            f"<b>Brand Name:</b> {brand_name}"
-        )
-        right_block_para = Paragraph(right_block_text, right_block_style)
-        right_block = Table([[right_block_para]], colWidths=[right_width])
-        right_block.setStyle(TableStyle([
+        # ---------------- ROW 1 RIGHT - top-aligned, two-row nested with divider under PI row ----------------
+        # right_top: No. & date of PI (single-line)
+        right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
+        right_top = Table([[right_top_para]], colWidths=[right_width])
+        right_top.setStyle(TableStyle([
             ("LEFTPADDING",(0,0),(-1,-1),4),
             ("RIGHTPADDING",(0,0),(-1,-1),4),
             ("TOPPADDING",(0,0),(-1,-1),2),
             ("BOTTOMPADDING",(0,0),(-1,-1),2),
-            ("VALIGN",(0,0),(-1,-1),"TOP"),  # top align content inside this cell
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            # draw a thin line under this top row
+            ("LINEBELOW",(0,0),(0,0),0.6,colors.black)
         ]))
 
-        # ---------------- ROW 2 (Consignee left, Payment terms right) ----------------
+        # right_bottom: order reference / buyer / brand
+        right_bottom_para = Paragraph(
+            f"<b>Landmark order Reference:</b> {order_no}<br/>"
+            f"<b>Buyer Name:</b> {buyer_name}<br/>"
+            f"<b>Brand Name:</b> {brand_name}", right_block_style
+        )
+        right_bottom = Table([[right_bottom_para]], colWidths=[right_width])
+        right_bottom.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),4),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),2),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+        ]))
+
+        right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width], rowHeights=[None, None])
+        # explicitly top-align the right column in the header table later; keep this stack minimal
+        right_stack.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+        ]))
+
+        # ---------------- ROW 2 (Consignee left, Payment right) ----------------
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([
@@ -249,6 +268,8 @@ if agg_df is not None:
 
         # Payment terms block: label + spacer + values aligned to ORIGIN start
         label_col_w = table_width * 0.08
+        spacer_w = indent_inside_right = max(0, (style_prop + item_prop + fabric_prop + 0.10 + 0.15) * table_width - left_width) if 'table_width' in locals() else 0
+        # (compute value_col_w safely)
         spacer_w = indent_inside_right
         value_col_w = right_width - label_col_w - spacer_w - 6
         if value_col_w < 50:
@@ -314,13 +335,12 @@ if agg_df is not None:
 
         # assemble header table (4 rows)
         header_table = Table([
-            [supplier_stack, right_block],   # row 1: supplier left, right single block
-            [consignee_box, payment_box],    # row 2
-            [left_row3_box, right_row3_box], # row 3
-            [left_row4_box, right_row4_box]  # row 4
+            [supplier_stack, right_stack],   # row 1: supplier left, right single block with top divider under PI
+            [consignee_box, payment_box],
+            [left_row3_box, right_row3_box],
+            [left_row4_box, right_row4_box]
         ], colWidths=[left_width, right_width])
 
-        # Force the whole right column to top-align; the left column top as well
         header_table.setStyle(TableStyle([
             ("VALIGN",(0,0),(0,3),"TOP"),
             ("VALIGN",(1,0),(1,3),"TOP"),
