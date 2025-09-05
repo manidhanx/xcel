@@ -1,4 +1,4 @@
-# proforma_v12.9.3_fix_row3_row4_align_update.py
+# proforma_v12.9.3_shift_currency_and_breaks.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -255,9 +255,9 @@ if agg_df is not None:
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # === Row3 right: inserted THREE <br/> between the two lines (reduced by one) ===
+        # Right row3 : 3 breaks (kept)
         right_row3_para = Paragraph(
-            f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/>"  # 3 breaks now
+            f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/>"
             f"<b>Remarks:</b> (if any)",
             row1_normal
         )
@@ -268,26 +268,41 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # === Row4 right: ensure bottom-right aligned (explicit) ===
-        currency_para = Paragraph("CURRENCY: USD", row1_normal)
-        inner_currency = Table([[currency_para]], colWidths=[right_width - 8], rowHeights=[28])
+        # === NEW: Row4 right - add TWO line breaks and shift right by 7 spacer columns ===
+        currency_para = Paragraph("<br/><br/>CURRENCY: USD", row1_normal)
+
+        # Create 7 spacer columns + 1 column for the currency itself.
+        # We'll make each spacer a small fraction of right_width so currency ends up far right.
+        # If you want it further right/left, adjust spacer_fraction below.
+        spacer_fraction = 0.065  # fraction of right_width to use per spacer column
+        spacer_w = max(8, right_width * spacer_fraction)  # minimal width to avoid collapse
+        # ensure last column gets remaining width
+        last_col_w = max(40, right_width - (spacer_w * 7))
+
+        currency_inner_cols = [spacer_w] * 7 + [last_col_w]
+        # Build a single-row inner table with 8 columns: first 7 empty, last contains currency
+        inner_row = [""] * 7 + [currency_para]
+        inner_currency = Table([inner_row], colWidths=currency_inner_cols, rowHeights=[28])
         inner_currency.setStyle(TableStyle([
-            ("ALIGN",(0,0),(0,0),"RIGHT"),
-            ("VALIGN",(0,0),(0,0),"BOTTOM"),
-            ("LEFTPADDING",(0,0),(0,0),0),
-            ("RIGHTPADDING",(0,0),(0,0),0),
-            ("TOPPADDING",(0,0),(0,0),0),
-            ("BOTTOMPADDING",(0,0),(0,0),0),
+            ("ALIGN",(0,0),(6,0),"LEFT"),
+            ("ALIGN",(7,0),(7,0),"RIGHT"),
+            ("VALIGN",(0,0),(7,0),"BOTTOM"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
+
+        # wrap inner_currency in an outer cell to ensure bottom alignment
         right_row4_box = Table([[inner_currency]], colWidths=[right_width])
         right_row4_box.setStyle(TableStyle([
             ("VALIGN",(0,0),(0,0),"BOTTOM"),
-            ("ALIGN",(0,0),(0,0),"RIGHT"),
             ("LEFTPADDING",(0,0),(0,0),4),
             ("RIGHTPADDING",(0,0),(0,0),4),
             ("TOPPADDING",(0,0),(0,0),0),
             ("BOTTOMPADDING",(0,0),(0,0),2),
         ]))
+        # ======================================================================
 
         header_table = Table([
             [supplier_stack, right_stack],
@@ -311,7 +326,7 @@ if agg_df is not None:
 
         elements.append(header_table)
 
-        # ---------------------- ITEMS / STYLE TABLE (unchanged) ----------------------
+        # ---------------------- ITEMS / STYLE TABLE ----------------------
         header_labels = [
             "STYLE NO.",
             "ITEM DESCRIPTION",
