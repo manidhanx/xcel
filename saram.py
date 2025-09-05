@@ -1,4 +1,4 @@
-# proforma_v12.9.3_fix_table_header_dividers_total_white_lineabove.py
+# proforma_v12.9.3_fix_table_small_tweaks_row3_row4_align.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator")
+st.title("📑 Proforma Invoice Generator (v12.9.3 - tweaks)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -246,12 +246,14 @@ if agg_df is not None:
         payment_block = Table([[pay_term_tbl],[blank_row],[bank_heading_tbl],[bank_inner]], colWidths=[right_width])
         payment_block.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),2),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
 
+        # ROW3 & ROW4 blocks
         left_row3_para = Paragraph(f"<b>Loading Country:</b> {made_in or ''}<br/><b>Port of Loading:</b> {loading_port or ''}<br/><b>Agreed Shipment Date:</b> {ship_date or ''}", row1_normal)
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
+        # === Tweak: add two breaks between the two lines in row3 right ===
         right_row3_para = Paragraph(
-            f"<b>L/C Advising Bank:</b> (If applicable)<br/>"
+            f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/>"   # two breaks inserted
             f"<b>Remarks:</b> (if any)",
             row1_normal
         )
@@ -262,9 +264,18 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
+        # === Tweak: make currency bottom-right aligned inside its cell ===
         right_row4_para = Paragraph("CURRENCY: USD", row1_normal)
+        # Use a nested table so we can apply ALIGN + VALIGN for the single cell
         right_row4_box = Table([[right_row4_para]], colWidths=[right_width])
-        right_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        right_row4_box.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),4),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("VALIGN",(0,0),(-1,-1),"BOTTOM"),   # vertical bottom
+            ("ALIGN",(0,0),(0,0),"RIGHT"),       # horizontal right
+            ("TOPPADDING",(0,0),(-1,-1),2),
+            ("BOTTOMPADDING",(0,0),(-1,-1),6),
+        ]))
 
         header_table = Table([
             [supplier_stack, right_stack],
@@ -288,7 +299,7 @@ if agg_df is not None:
 
         elements.append(header_table)
 
-        # ---------------------- ITEMS / STYLE TABLE (header vertical dividers + total white) ----------------------
+        # ---------------------- ITEMS / STYLE TABLE (unchanged from last working) ----------------------
         header_labels = [
             "STYLE NO.",
             "ITEM DESCRIPTION",
@@ -327,12 +338,11 @@ if agg_df is not None:
 
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
 
-        # Start with body GRID (gives vertical separators in body)
         items_style = TableStyle([
             ("GRID",(0,1),(-1,-1),0.25,colors.black),
             ("LINEBELOW",(0,0),(-1,0),0.35,colors.black),    # header underline
-            ("BACKGROUND",(0,0),(-1,0),colors.white),        # header bg white
-            ("TEXTCOLOR",(0,0),(-1,0),colors.black),         # header text black
+            ("BACKGROUND",(0,0),(-1,0),colors.white),
+            ("TEXTCOLOR",(0,0),(-1,0),colors.black),
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
             ("FONTSIZE",(0,0),(-1,0),6.5),
@@ -343,8 +353,8 @@ if agg_df is not None:
         ])
 
         # blank horizontal dividers in body (keep verticals)
-        items_style.add("LINEBELOW",(0,1),(-1,-2),0.25,colors.white)  # rows except last (total) blanked
-        # ensure the line below the last body row (just above total) is black (so total top line is visible)
+        items_style.add("LINEBELOW",(0,1),(-1,-2),0.25,colors.white)
+        # ensure the line below the last body row (just above total) is black
         items_style.add("LINEBELOW",(0, len(data)-2),(-1, len(data)-2),0.35,colors.black)
 
         # Make TOTAL row white and add strong black line above TOTAL
@@ -352,7 +362,7 @@ if agg_df is not None:
         items_style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
         items_style.add("LINEABOVE",(0,len(data)-1),(-1,len(data)-1),0.35,colors.black)
 
-        # Draw vertical separators on header row explicitly so header shows column dividers
+        # Draw vertical separators on header row so header shows column dividers
         ncols = len(col_widths)
         for col_idx in range(ncols - 1):
             items_style.add("LINEAFTER",(col_idx,0),(col_idx,0),0.25,colors.black)
