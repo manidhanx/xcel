@@ -1,4 +1,4 @@
-# proforma_v12.9.5_revert_top_blocks.py
+# proforma_v12.9.3_fix_row3_right.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -8,25 +8,18 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import tempfile, os
 from datetime import datetime
 
-# --- number to words (pure Python)
 def number_to_words(n):
     ones = ["","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE",
             "TEN","ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN",
             "SEVENTEEN","EIGHTEEN","NINETEEN"]
     tens = ["","","TWENTY","THIRTY","FORTY","FIFTY","SIXTY","SEVENTY","EIGHTY","NINETY"]
     def words(num):
-        if num < 20:
-            return ones[num]
-        elif num < 100:
-            return tens[num//10] + ("" if num%10==0 else " " + ones[num%10])
-        elif num < 1000:
-            return ones[num//100] + " HUNDRED" + ("" if num%100==0 else " " + words(num%100))
-        elif num < 1_000_000:
-            return words(num//1000) + " THOUSAND" + ("" if num%1000==0 else " " + words(num%1000))
-        elif num < 1_000_000_000:
-            return words(num//1_000_000) + " MILLION" + ("" if num%1_000_000==0 else " " + words(num%1_000_000))
-        else:
-            return str(num)
+        if num < 20: return ones[num]
+        elif num < 100: return tens[num//10] + ("" if num%10==0 else " " + ones[num%10])
+        elif num < 1000: return ones[num//100] + " HUNDRED" + ("" if num%100==0 else " " + words(num%100))
+        elif num < 1_000_000: return words(num//1000) + " THOUSAND" + ("" if num%1000==0 else " " + words(num%1000))
+        elif num < 1_000_000_000: return words(num//1_000_000) + " MILLION" + ("" if num%1_000_000==0 else " " + words(num%1_000_000))
+        else: return str(num)
     return words(n)
 
 def amount_to_words(amount):
@@ -38,13 +31,13 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.9.5)")
+st.title("📑 Proforma Invoice Generator (v12.9.3)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
+
 agg_df = None
 order_no = made_in = loading_port = ship_date = order_of = texture = country_of_origin = None
 
-# --- parse uploaded Excel (headerless scan to find top blocks and header row) ---
 if uploaded_file:
     raw_df = pd.read_excel(uploaded_file, header=None)
 
@@ -88,53 +81,42 @@ if uploaded_file:
         df.columns = [" ".join([str(x) for x in col if str(x)!="nan"]).strip() for col in df.columns.values]
         df = df.dropna(how="all")
 
-        # detect style and qty columns (value-based heuristic)
         style_col = next((c for c in df.columns if str(c).strip().lower().startswith("style")), None)
-        qty_col = None
-        value_col_index = None
+        qty_col, value_col_index = None, None
         for idx, col in enumerate(df.columns):
             if "value" in str(col).lower():
                 value_col_index = idx
                 break
-        if value_col_index and value_col_index > 0:
+        if value_col_index and value_col_index>0:
             qty_col = df.columns[value_col_index-1]
         fob_col = next((c for c in df.columns if "fob" in str(c).lower()), None)
 
         if not style_col or not qty_col:
             st.error("❌ Could not detect Qty/Style column.")
         else:
-            aggregated_data = []
+            aggregated_data=[]
             for style in df[style_col].dropna().unique():
-                rows = df[df[style_col] == style]
-                if len(rows) > 0:
-                    r = rows.iloc[0]
-                    desc = r.iloc[1] if len(r) > 1 else ""
-                    comp = r.iloc[2] if len(r) > 2 else ""
-                    total_qty = pd.to_numeric(rows[qty_col], errors='coerce').fillna(0).sum()
-                    unit_price = 0
+                rows=df[df[style_col]==style]
+                if len(rows)>0:
+                    r=rows.iloc[0]
+                    desc=r.iloc[1] if len(r)>1 else ""
+                    comp=r.iloc[2] if len(r)>2 else ""
+                    total_qty=pd.to_numeric(rows[qty_col],errors='coerce').fillna(0).sum()
+                    unit_price=0
                     if fob_col and fob_col in rows.columns:
-                        prices = pd.to_numeric(rows[fob_col], errors='coerce').fillna(0)
-                        nz = prices[prices > 0]
-                        unit_price = nz.iloc[0] if len(nz) > 0 else 0
-                    amount = total_qty * unit_price
-                    aggregated_data.append([
-                        style,
-                        desc,
-                        texture or "Knitted",
-                        "61112000",
-                        comp,
-                        country_of_origin or "India",
-                        int(total_qty),
-                        f"{unit_price:.2f}",
-                        f"{amount:.2f}"
-                    ])
-            agg_df = pd.DataFrame(aggregated_data, columns=[
-                "STYLE NO.", "ITEM DESCRIPTION", "FABRIC TYPE", "H.S NO", "COMPOSITION", "ORIGIN", "QTY", "FOB", "AMOUNT"
+                        prices=pd.to_numeric(rows[fob_col],errors='coerce').fillna(0)
+                        nz=prices[prices>0]
+                        unit_price=nz.iloc[0] if len(nz)>0 else 0
+                    amount=total_qty*unit_price
+                    aggregated_data.append([style,desc,texture or "Knitted","61112000",comp,
+                        country_of_origin or "India",int(total_qty),f"{unit_price:.2f}",f"{amount:.2f}"])
+            agg_df=pd.DataFrame(aggregated_data,columns=[
+                "STYLE NO.","ITEM DESCRIPTION","FABRIC TYPE","H.S NO","COMPOSITION","ORIGIN","QTY","FOB","AMOUNT"
             ])
             st.write("### ✅ Parsed Order Data")
             st.dataframe(agg_df)
 
-# --- inputs after parsing succeeded ---
+# inputs & generate
 if agg_df is not None:
     st.write("### ✍️ Enter Invoice Details")
     today_str = datetime.today().strftime("%d/%m/%Y")
@@ -147,15 +129,14 @@ if agg_df is not None:
     payment_term_val = st.text_input("Payment Term", "T/T")
 
     if st.button("Generate Proforma Invoice"):
-        # create temp PDF
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            pdf_file = tmp.name
+        with tempfile.NamedTemporaryFile(delete=False,suffix=".pdf") as tmp:
+            pdf_file=tmp.name
 
-        doc = SimpleDocTemplate(pdf_file, pagesize=A4, leftMargin=30, rightMargin=30, topMargin=30, bottomMargin=30)
-        styles = getSampleStyleSheet()
-        normal = styles["Normal"]
+        doc=SimpleDocTemplate(pdf_file,pagesize=A4,leftMargin=30,rightMargin=30,topMargin=30,bottomMargin=30)
+        styles=getSampleStyleSheet()
+        normal=styles["Normal"]
 
-        # Paragraph styles
+        # paragraph styles (kept same)
         title_style = ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)
         supplier_label = ParagraphStyle("supplier_label", parent=normal, fontName="Helvetica-Bold", fontSize=8)
         supplier_company = ParagraphStyle("supplier_company", parent=normal, fontName="Helvetica-Bold", fontSize=7)
@@ -163,21 +144,21 @@ if agg_df is not None:
         supplier_small_value = ParagraphStyle("supplier_small_value", parent=normal, fontName="Helvetica", fontSize=6)
         right_block_style = ParagraphStyle("right_block", parent=normal, fontName="Helvetica", fontSize=8, leading=10)
         right_top_style = ParagraphStyle("right_top", parent=normal, fontName="Helvetica-Bold", fontSize=8, leading=9)
-        row1_normal = ParagraphStyle("row1_normal", parent=normal, fontName="Helvetica", fontSize=8)
-        payment_header_style = ParagraphStyle("payment_header", parent=normal, fontName="Helvetica-Bold", fontSize=7)
-        label_small = ParagraphStyle("label_small", parent=normal, fontName="Helvetica-Bold", fontSize=7)
-        value_small = ParagraphStyle("value_small", parent=normal, fontName="Helvetica", fontSize=7, leading=8)
+        row1_font_size = 8
+        row1_normal = ParagraphStyle("row1_normal", parent=normal, fontName="Helvetica", fontSize=row1_font_size)
+        payment_header_style=ParagraphStyle("payment_header", parent=normal, fontName="Helvetica-Bold", fontSize=7)
+        label_small=ParagraphStyle("label_small", parent=normal, fontName="Helvetica-Bold", fontSize=7)
+        value_small=ParagraphStyle("value_small", parent=normal, fontName="Helvetica", fontSize=7, leading=8)
 
-        elements = []
-        content_width = A4[0] - 110          # outer content width inside margins
-        available_width = content_width - 0.5  # tiny safety margin
+        elements=[]
+        content_width = A4[0] - 110
+        available_width = content_width - 0.5
 
-        # column proportions for 9 columns (normalized)
+        # column proportions (same proportions you've been using)
         props = [0.125, 0.185, 0.12, 0.10, 0.15, 0.08, 0.07, 0.08, 0.09]
         total_prop = sum(props)
         props = [p/total_prop for p in props]
         col_widths = [available_width * p for p in props]
-        # clamp any rounding diff to last column
         diff = available_width - sum(col_widths)
         if abs(diff) > 0:
             col_widths[-1] += diff
@@ -185,7 +166,7 @@ if agg_df is not None:
         left_width = sum(col_widths[:3])
         right_width = available_width - left_width
 
-        # compute spacer_to_origin for aligning bank answers relative to origin cell
+        # compute spacer_to_origin (for aligning bank answers ':-' near ORIGIN)
         origin_left_absolute = sum(col_widths[:5])
         indent_inside_right = origin_left_absolute - left_width
         items_cell_left_padding = 4
@@ -193,71 +174,62 @@ if agg_df is not None:
         extra_left_shift = col_widths[6] * 3
         spacer_to_origin = max(0, indent_inside_right_corrected - extra_left_shift)
 
-        # Header: title (restored stable simple title row)
-        title_tbl = Table([[Paragraph("PROFORMA INVOICE", title_style)]], colWidths=[available_width])
-        title_tbl.setStyle(TableStyle([("ALIGN",(0,0),(-1,-1),"CENTER"), ("TOPPADDING",(0,0),(-1,-1),4), ("BOTTOMPADDING",(0,0),(-1,-1),4)]))
-        elements.append(title_tbl)
+        # --- Header / blocks ---
+        elements.append(Table([[Paragraph("PROFORMA INVOICE", title_style)]], colWidths=[available_width], style=[
+            ("ALIGN",(0,0),(-1,-1),"CENTER"),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
 
-        # ----------------- RESTORED TOP 4 ROW BLOCKS (last stable layout) -----------------
-        # Supplier left (row1)
+        # supplier (left breathing for rows 1 & 2)
         supplier_title = Table([
             [Paragraph("Supplier Name:", supplier_label)],
             [Paragraph("SAR APPARELS INDIA PVT.LTD.", supplier_company)]
         ], colWidths=[left_width])
-        supplier_title.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        supplier_title.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
         supplier_contact = Table([
             [Paragraph("Address:", supplier_small_label), Paragraph("6, Picaso Bithi, Kolkata - 700017", supplier_small_value)],
             [Paragraph("Phone:", supplier_small_label), Paragraph("9817473373", supplier_small_value)],
             [Paragraph("Fax:", supplier_small_label), Paragraph("N.A.", supplier_small_value)]
         ], colWidths=[left_width*0.30, left_width*0.70])
-        supplier_contact.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        supplier_contact.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),("TOPPADDING",(0,0),(-1,-1),1),("BOTTOMPADDING",(0,0),(-1,-1),1),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
         supplier_stack = Table([[supplier_title],[supplier_contact]], colWidths=[left_width])
-        supplier_stack.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP")]))
+        supplier_stack.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),6)]))
 
-        # Right block row1: PI top and bottom (no nested height experiments)
+        # right blocks (PI / order reference)
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
-        right_top.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),3),
-            ("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),
-            ("VALIGN",(0,0),(-1,-1),"TOP"),("LINEBELOW",(0,0),(0,0),0.6,colors.black)
-        ]))
+        right_top.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),3),("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP"),("LINEBELOW",(0,0),(0,0),0.6,colors.black)]))
 
-        right_bottom_para = Paragraph(
-            f"<b>Landmark order Reference:</b> {order_no}<br/>"
-            f"<b>Buyer Name:</b> {buyer_name}<br/>"
-            f"<b>Brand Name:</b> {brand_name}",
-            right_block_style
-        )
+        right_bottom_para = Paragraph(f"<b>Landmark order Reference:</b> {order_no}<br/><b>Buyer Name:</b> {buyer_name}<br/><b>Brand Name:</b> {brand_name}", right_block_style)
         right_bottom = Table([[right_bottom_para]], colWidths=[right_width])
         right_bottom.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),3),("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
         right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width])
-        right_stack.setStyle(TableStyle([("VALIGN",(0,0),(0,1),"TOP")]))
+        right_stack.setStyle(TableStyle([("VALIGN",(0,0),(0,1),"TOP"),("LEFTPADDING",(0,0),(0,1),2),("RIGHTPADDING",(0,0),(0,1),0)]))
 
-        # Row2 left: consignee (restored size matching row1)
+        # consignee and payment blocks
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", row1_normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # Row2 right: Payment & Bank block (restored alignment)
         pay_label = Paragraph("Payment Term:", label_small)
         pay_value = Paragraph(payment_term_val, value_small)
         pay_term_tbl = Table([[pay_label, pay_value]], colWidths=[right_width*0.28, right_width*0.72])
-        pay_term_tbl.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP")]))
+        pay_term_tbl.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0)]))
 
         blank_row = Table([[""]], colWidths=[right_width])
         blank_row.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2)]))
 
         bank_heading = Paragraph("Bank Details (Including Swift/IBAN)", payment_header_style)
         bank_heading_tbl = Table([[bank_heading]], colWidths=[right_width])
-        bank_heading_tbl.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),2)]))
+        bank_heading_tbl.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),2)]))
 
         colon_w = 9
         label_col_w = max(80, available_width * 0.08)
-        remaining = right_width - label_col_w - spacer_to_origin - colon_w - 6
+        remaining = right_width - spacer_to_origin - label_col_w - colon_w - 6
         value_col_w = max(90, remaining)
 
         bank_rows = []
@@ -275,49 +247,42 @@ if agg_df is not None:
         bank_inner.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
 
         payment_block = Table([[pay_term_tbl],[blank_row],[bank_heading_tbl],[bank_inner]], colWidths=[right_width])
-        payment_block.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),2)]))
+        payment_block.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),2),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
 
-        # Row3 left (restored)
-        left_row3_para = Paragraph(
-            f"<b>Loading Country:</b> {made_in or ''}<br/>"
-            f"<b>Port of Loading:</b> {loading_port or ''}<br/>"
-            f"<b>Agreed Shipment Date:</b> {ship_date or ''}",
-            row1_normal
-        )
+        # ROW3 & ROW4 blocks
+        left_row3_para = Paragraph(f"<b>Loading Country:</b> {made_in or ''}<br/><b>Port of Loading:</b> {loading_port or ''}<br/><b>Agreed Shipment Date:</b> {ship_date or ''}", row1_normal)
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # Row3 right: L/C Advising Bank first, then blank lines, then Remarks (restored)
+        # ---------- FIX: ROW 3 RIGHT BLOCK (removed duplicate 'Loading Country' and reordered) ----------
+        # Now shows:
+        #   L/C Advising Bank: (If applicable)   <-- first
+        #   Remarks: (if any)                     <-- last
         right_row3_para = Paragraph(
-            f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/><br/>"
+            f"<b>L/C Advising Bank:</b> (If applicable)<br/>"
             f"<b>Remarks:</b> (if any)",
             row1_normal
         )
+        # ---------------------------------------------------------------------------------------------
+
         right_row3_box = Table([[right_row3_para]], colWidths=[right_width])
         right_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # Row4 left (restored)
         left_row4_para = Paragraph(f"<b>Description of goods:</b> {order_of or 'Value Packs'}", row1_normal)
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # Row4 right: currency bottom-right aligned (kept)
         right_row4_para = Paragraph("CURRENCY: USD", row1_normal)
         right_row4_box = Table([[right_row4_para]], colWidths=[right_width])
-        right_row4_box.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),4),
-            ("RIGHTPADDING",(0,0),(-1,-1),4),
-            ("VALIGN",(0,0),(-1,-1),"BOTTOM"),
-            ("ALIGN",(0,0),(-1,-1),"RIGHT")
-        ]))
+        right_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # assemble header table using stable row heights (restored)
+        # assemble header with bottom dividing line enabled to sit on top of items
         header_table = Table([
             [supplier_stack, right_stack],
             [consignee_box, payment_block],
             [left_row3_box, right_row3_box],
             [left_row4_box, right_row4_box]
-        ], colWidths=[left_width, right_width], rowHeights=[None, None, 56, 56])  # restored heights
+        ], colWidths=[left_width, right_width], rowHeights=[None, None, 56, 56])
 
         header_table.setStyle(TableStyle([
             ("VALIGN",(0,0),(1,3),"TOP"),
@@ -325,7 +290,7 @@ if agg_df is not None:
             ("LINEBELOW",(0,0),(1,0),0.35,colors.black),
             ("LINEBELOW",(0,1),(1,1),0.35,colors.black),
             ("LINEBELOW",(0,2),(1,2),0.35,colors.black),
-            ("LINEBELOW",(0,3),(1,3),0.9,colors.black),  # header bottom -> items top border
+            ("LINEBELOW",(0,3),(1,3),0.9,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),2),
@@ -335,30 +300,14 @@ if agg_df is not None:
         elements.append(header_table)
         # no spacer — header bottom line is the top border of the items table
 
-        # ---------------- items table: header + padded body + total ----------------
-        header_row = list(agg_df.columns)
-        body_rows = [list(row) for _, row in agg_df.iterrows()]
-        total_row = ["TOTAL", "", "", "", "", "", f"{int(agg_df['QTY'].sum()):,}", "USD", f"{agg_df['AMOUNT'].astype(float).sum():,.2f}"]
+        # items table (columns sum to available_width)
+        data=[list(agg_df.columns)]
+        for _,row in agg_df.iterrows(): data.append(list(row))
+        total_qty = agg_df["QTY"].sum()
+        total_amount = agg_df["AMOUNT"].astype(float).sum()
+        data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
 
-        min_body_rows = 12
-        actual_body_count = len(body_rows)
-        body_count = max(min_body_rows, actual_body_count)
-
-        # pad body rows with empty rows if needed
-        if actual_body_count < body_count:
-            empty_row = [""] * len(header_row)
-            for _ in range(body_count - actual_body_count):
-                body_rows.append(empty_row.copy())
-
-        data = [header_row] + body_rows + [total_row]
-
-        # row heights: header (normal feel), body rows, total row
-        header_row_height = 36
-        body_row_height = 20
-        total_row_height = body_row_height + 4
-        row_heights = [header_row_height] + [body_row_height] * body_count + [total_row_height]
-
-        items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
+        items_table = Table(data, colWidths=col_widths, repeatRows=1)
         items_style = TableStyle([
             ("LINEBELOW",(0,0),(-1,0),0.25,colors.black),
             ("GRID",(0,1),(-1,-1),0.25,colors.black),
@@ -366,7 +315,7 @@ if agg_df is not None:
             ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
             ("ALIGN",(0,0),(-1,0),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-            ("FONTSIZE",(0,0),(-1,-1),8),
+            ("FONTSIZE",(0,0),(-1,0),7),
             ("ALIGN",(0,1),(5,-1),"CENTER"),
             ("ALIGN",(6,1),(-1,-1),"RIGHT"),
             ("FONTSIZE",(0,1),(-1,-1),8),
@@ -380,36 +329,27 @@ if agg_df is not None:
 
         elements.append(items_table)
 
-        # amount in words
-        total_amount = agg_df["AMOUNT"].astype(float).sum()
+        # amount words, terms & signature (unchanged)
         amount_words = amount_to_words(total_amount)
         words_table = Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]], colWidths=[available_width])
         words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
         elements.append(words_table)
 
-        # terms & signature
         terms_table = Table([[Paragraph("Terms & Conditions (if any):", normal)]], colWidths=[available_width])
         terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
         elements.append(terms_table)
         elements.append(Spacer(1,12))
 
         sig_img = "sarsign.png"
-        try:
-            sign_img = Image(sig_img, width=150, height=50)
-        except Exception:
-            sign_img = Paragraph("", normal)
-
-        sign_table = Table([[sign_img, Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]], colWidths=[0.5*available_width, 0.5*available_width])
+        sign_table = Table([[Image(sig_img,width=150,height=50), Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]], colWidths=[0.5*available_width,0.5*available_width])
         sign_table.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"MIDDLE"),("ALIGN",(0,0),(0,0),"LEFT"),("ALIGN",(1,0),(1,0),"RIGHT"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("FONTSIZE",(0,0),(-1,-1),8)]))
         elements.append(sign_table)
 
-        # outer frame
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
         outer_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.75,colors.black),("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0)]))
 
         doc.build([outer_table])
 
-        # download button
         with open(pdf_file, "rb") as f:
             st.download_button("⬇️ Download Proforma Invoice", f, file_name="Proforma_Invoice.pdf", mime="application/pdf")
         os.remove(pdf_file)
