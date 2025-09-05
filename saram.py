@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.3.2 Pure Reference)")
+st.title("📑 Proforma Invoice Generator (v12.3.3 Pure Reference)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -140,15 +140,15 @@ if agg_df is not None:
         normal=styles["Normal"]
         bold=ParagraphStyle("bold",parent=normal,fontName="Helvetica-Bold",fontSize=10)
         small_bold=ParagraphStyle("small_bold",parent=normal,fontName="Helvetica-Bold",fontSize=8)
-        label_small=ParagraphStyle("label_small",parent=normal,fontName="Helvetica-Bold",fontSize=6)  # two points smaller
-        value_small=ParagraphStyle("value_small",parent=normal,fontName="Helvetica",fontSize=6)    # answers same small size
+        label_small=ParagraphStyle("label_small",parent=normal,fontName="Helvetica-Bold",fontSize=6)
+        value_small=ParagraphStyle("value_small",parent=normal,fontName="Helvetica",fontSize=6)
 
         elements=[]
-        content_width = A4[0] - 110          # outer content width (boxed area)
+        content_width = A4[0] - 110
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # --- New proportions: STYLE 12.5%, ITEM 18.5%, FABRIC 12% (sum 43% left block) ---
+        # proportions
         style_prop = 0.125
         item_prop = 0.185
         fabric_prop = 0.12
@@ -156,15 +156,16 @@ if agg_df is not None:
         left_width = table_width * (style_prop + item_prop + fabric_prop)
         right_width = inner_width - left_width
 
-        # --- Build a combined header table: title row (spans 2 cols) + supplier/payment row
-        title_para = Paragraph("<b>PROFORMA INVOICE</b>", ParagraphStyle("title", parent=normal, alignment=1, fontSize=7))
-        # Supplier inner: labels (small) and values (small), company on next line left aligned with label
+        # supplier inner columns
         style_col_width = table_width * style_prop
         supplier_inner_col2 = left_width - style_col_width
 
+        # --- Build header_section table: title row, supplier/payment row, shipment row ---
+        title_para = Paragraph("<b>PROFORMA INVOICE</b>", ParagraphStyle("title", parent=normal, alignment=1, fontSize=7))
+
         supplier_lines = [
-            [Paragraph("Supplier Name:", label_small), Paragraph("", value_small)],              # label only on first line
-            [Paragraph("", label_small), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],# company on next line, left aligned under label
+            [Paragraph("Supplier Name:", label_small), Paragraph("", value_small)],   # empty second cell; company next line
+            [Paragraph("", label_small), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],
             [Paragraph("Address:", label_small), Paragraph("6, Picaso Bithi, Kolkata - 700017", value_small)],
             [Paragraph("Phone:", label_small), Paragraph("9817473373", value_small)],
             [Paragraph("Fax:", label_small), Paragraph("N.A.", value_small)]
@@ -178,78 +179,61 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),1),
         ]))
 
-        # Payment and consignee content
+        supplier_box = Table([[supplier_inner]], colWidths=[left_width])
+        supplier_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),
+                                          ("RIGHTPADDING",(0,0),(-1,-1),0),
+                                          ("TOPPADDING",(0,0),(-1,-1),0),
+                                          ("BOTTOMPADDING",(0,0),(-1,-1),0),]))
+
         payment_lines = f"PI No.: {pi_no}<br/>Landmark order Reference: {order_no}<br/>Buyer Name: {buyer_name}<br/>Brand Name: {brand_name}"
         payment_para = Paragraph(payment_lines, normal)
         consignee_lines = f"Consignee:<br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}"
         consignee_para = Paragraph(consignee_lines, normal)
 
-        supplier_box = Table([[supplier_inner]], colWidths=[left_width])
-        supplier_box.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),0),
-            ("TOPPADDING",(0,0),(-1,-1),0),
-            ("BOTTOMPADDING",(0,0),(-1,-1),0),
-        ]))
-
         payment_box = Table([[payment_para]], colWidths=[right_width])
-        payment_box.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),4),
-            ("RIGHTPADDING",(0,0),(-1,-1),4),
-            ("TOPPADDING",(0,0),(-1,-1),4),
-            ("BOTTOMPADDING",(0,0),(-1,-1),4),
-        ]))
-
+        payment_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),
+                                        ("RIGHTPADDING",(0,0),(-1,-1),4),
+                                        ("TOPPADDING",(0,0),(-1,-1),4),
+                                        ("BOTTOMPADDING",(0,0),(-1,-1),4),]))
         consignee_box = Table([[consignee_para]], colWidths=[right_width])
-        consignee_box.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),4),
-            ("RIGHTPADDING",(0,0),(-1,-1),4),
-            ("TOPPADDING",(0,0),(-1,-1),4),
-            ("BOTTOMPADDING",(0,0),(-1,-1),4),
-        ]))
+        consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),
+                                          ("RIGHTPADDING",(0,0),(-1,-1),4),
+                                          ("TOPPADDING",(0,0),(-1,-1),4),
+                                          ("BOTTOMPADDING",(0,0),(-1,-1),4),]))
 
+        # right column stack
         right_nested = Table([[payment_box],[consignee_box]], colWidths=[right_width])
-        right_nested.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP")]))
+        right_nested.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),
+                                          ("LEFTPADDING",(0,0),(-1,-1),0),
+                                          ("RIGHTPADDING",(0,0),(-1,-1),0),
+                                          ("TOPPADDING",(0,0),(-1,-1),0),
+                                          ("BOTTOMPADDING",(0,0),(-1,-1),0),]))
 
-        # Combined header table
-        combined = Table([
+        # shipment as two paragraphs so no internal vertical line appears
+        left_ship = Paragraph(f"<b>Loading Country:</b> {made_in}<br/><b>Agreed Shipment Date:</b> {ship_date}", normal)
+        right_ship = Paragraph(f"<b>Port of Loading:</b> {loading_port}<br/><b>Description of goods:</b> {order_of}", normal)
+
+        # header_section table (3 rows)
+        header_section = Table([
             [title_para, ""],
-            [supplier_box, right_nested]
+            [supplier_box, right_nested],
+            [left_ship, right_ship]
         ], colWidths=[left_width, right_width])
-        combined.setStyle(TableStyle([
-            ("SPAN",(0,0),(1,0)),                      # span title across both columns
+        header_section.setStyle(TableStyle([
+            ("SPAN",(0,0),(1,0)),               # title spans both cols
             ("ALIGN",(0,0),(1,0),"CENTER"),
             ("VALIGN",(0,0),(1,0),"MIDDLE"),
-            # vertical divider line at the end of left column: from top row to bottom row (row 0 to row 1)
-            ("LINEAFTER",(0,0),(0,1),0.75,colors.black),
-            # remove inner cell lines
-            ("BOX",(0,0),(-1,-1),0,colors.white),
+            ("LINEAFTER",(0,0),(0,2),0.75,colors.black),  # vertical divider through rows 0..2
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
 
-        elements.append(combined)
+        elements.append(header_section)
         elements.append(Spacer(1,8))
 
-        # --- Shipment Info (pure) ---
-        ship=[
-            [Paragraph("<b>Loading Country:</b> "+str(made_in), normal), Paragraph("<b>Port of Loading:</b> "+str(loading_port), normal)],
-            [Paragraph("<b>Agreed Shipment Date:</b> "+str(ship_date), normal), Paragraph("<b>Description of goods:</b> "+str(order_of), normal)]
-        ]
-        ship_table=Table(ship,colWidths=[0.5*inner_width,0.5*inner_width])
-        ship_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                        ("FONTSIZE",(0,0),(-1,-1),8),
-                                        ("LEFTPADDING",(0,0),(-1,-1),4),
-                                        ("RIGHTPADDING",(0,0),(-1,-1),4),
-                                        ("TOPPADDING",(0,0),(-1,-1),2),
-                                        ("BOTTOMPADDING",(0,0),(-1,-1),2),
-                                        ]))
-        elements.append(ship_table)
-        elements.append(Spacer(1,8))
-
-        # --- Main Items Table ---
+        # --- Main Items Table (unchanged) ---
         data=[list(agg_df.columns)]
         for _,row in agg_df.iterrows(): data.append(list(row))
         total_qty=agg_df["QTY"].sum()
@@ -257,15 +241,15 @@ if agg_df is not None:
         data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
 
         col_widths = [
-            table_width * style_prop,    # STYLE NO. (12.5%)
-            table_width * item_prop,     # ITEM DESCRIPTION (18.5%)
-            table_width * fabric_prop,   # FABRIC TYPE (12%)
-            table_width * 0.10,          # H.S NO
-            table_width * 0.15,          # COMPOSITION
-            table_width * 0.08,          # ORIGIN
-            table_width * 0.07,          # QTY
-            table_width * 0.08,          # FOB
-            table_width * 0.09           # AMOUNT
+            table_width * style_prop,
+            table_width * item_prop,
+            table_width * fabric_prop,
+            table_width * 0.10,
+            table_width * 0.15,
+            table_width * 0.08,
+            table_width * 0.07,
+            table_width * 0.08,
+            table_width * 0.09
         ]
 
         table=Table(data,colWidths=col_widths,repeatRows=1)
