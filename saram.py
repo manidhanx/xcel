@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.1 Pure Reference)")
+st.title("📑 Proforma Invoice Generator (v12.2 Pure Reference)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -146,47 +146,81 @@ if agg_df is not None:
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # --- Row 1: Header (small & centered) ---
+        # --- Row 1: Header (half size, centered) ---
         title_table = Table([
-            [Paragraph("<font size=14><b>PROFORMA INVOICE</b></font>", bold)]
+            [Paragraph("<font size=7><b>PROFORMA INVOICE</b></font>", bold)]
         ], colWidths=[inner_width])
         title_table.setStyle(TableStyle([
-            ("GRID",(0,0),(-1,-1),0.75,colors.black),
+            ("BOX",(0,0),(-1,-1),0.75,colors.black),
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ("TOPPADDING",(0,0),(-1,-1),6),
-            ("BOTTOMPADDING",(0,0),(-1,-1),6),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
         elements.append(title_table)
-        # --- Row 2: removed (no Spacer here) ---
+        # Row 2: removed (no empty spacer)
 
-        # --- Row 3: Supplier line with company moved to next line ---
-        sup=[
-            [Paragraph("Supplier Name:<br/>SAR APPARELS INDIA PVT.LTD.", small_bold), Paragraph(pi_no, normal)],
-            [Paragraph("Address: 6, Picaso Bithi, Kolkata - 700017", normal), Paragraph("<b>Landmark order Reference:</b> "+str(order_no), normal)],
-            [Paragraph("Phone: 9817473373", normal), Paragraph("<b>Buyer Name:</b> "+buyer_name, normal)],
-            [Paragraph("Fax: N.A.", normal), Paragraph("<b>Brand Name:</b> "+brand_name, normal)],
-        ]
-        con=[
-            [Paragraph("<b>Consignee:</b>", normal), Paragraph(payment_term, normal)],
-            [Paragraph(consignee_name, normal), Paragraph("<b>Bank Details (Including Swift/IBAN):</b>", normal)],
-            [Paragraph(consignee_addr, normal), Paragraph("Beneficiary: SAR APPARELS INDIA PVT.LTD", normal)],
-            [Paragraph(consignee_tel, normal), Paragraph("Account No: 2112819952", normal)],
-            ["", Paragraph("Bank: Kotak Mahindra Bank Ltd", normal)],
-            ["", Paragraph("Address: 2 Brabourne Road, Govind Bhavan, Ground Floor, Kolkata - 700001", normal)],
-            ["", Paragraph("SWIFT: KKBKINBBCPC", normal)],
-            ["", Paragraph("Bank Code: 0323", normal)],
-        ]
-        info_table=Table(sup+con,colWidths=[0.5*inner_width,0.5*inner_width])
-        info_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                        ("VALIGN",(0,0),(-1,-1),"TOP"),
-                                        ("FONTSIZE",(0,0),(-1,-1),8),
-                                        ("LEFTPADDING",(0,0),(-1,-1),4),
-                                        ("RIGHTPADDING",(0,0),(-1,-1),4),
-                                        ("TOPPADDING",(0,0),(-1,-1),2),
-                                        ("BOTTOMPADDING",(0,0),(-1,-1),2),
-                                        ]))
-        elements.append(info_table)
+        # --- Row 3: Supplier/Payment/Consignee boxes (no internal row lines) ---
+        # Supplier block as single cell (multi-line paragraph)
+        supplier_lines = "Supplier Name:\nSAR APPARELS INDIA PVT.LTD.\nAddress: 6, Picaso Bithi, Kolkata - 700017\nPhone: 9817473373\nFax: N.A."
+        supplier_para = Paragraph(supplier_lines.replace("\n","<br/>"), small_bold)
+
+        # Payment / Order ref block (single-cell)
+        payment_lines = f"PI No.: {pi_no}\nLandmark order Reference: {order_no}\nBuyer Name: {buyer_name}\nBrand Name: {brand_name}"
+        payment_para = Paragraph(payment_lines.replace("\n","<br/>"), normal)
+
+        # Consignee block (single-cell)
+        consignee_lines = f"Consignee:\n{consignee_name}\n{consignee_addr}\n{consignee_tel}"
+        consignee_para = Paragraph(consignee_lines.replace("\n","<br/>"), normal)
+
+        # Build boxed tables (single-cell boxes) to avoid internal row lines
+        supplier_box = Table([[supplier_para]], colWidths=[0.48*inner_width])
+        supplier_box.setStyle(TableStyle([
+            ("BOX",(0,0),(-1,-1),0.5,colors.black),
+            ("LEFTPADDING",(0,0),(-1,-1),4),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
+
+        payment_box = Table([[payment_para]], colWidths=[0.48*inner_width])
+        payment_box.setStyle(TableStyle([
+            ("BOX",(0,0),(-1,-1),0.5,colors.black),
+            ("LEFTPADDING",(0,0),(-1,-1),4),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
+
+        consignee_box = Table([[consignee_para]], colWidths=[0.48*inner_width])
+        consignee_box.setStyle(TableStyle([
+            ("BOX",(0,0),(-1,-1),0.5,colors.black),
+            ("LEFTPADDING",(0,0),(-1,-1),4),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
+
+        # Right column: stack payment_box above consignee_box using a nested table
+        right_nested = Table([[payment_box],[consignee_box]], colWidths=[0.48*inner_width])
+        right_nested.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),0),
+        ]))
+
+        # Main two-column row: supplier_box | right_nested (payment + consignee)
+        info_row = Table([[supplier_box, right_nested]], colWidths=[0.5*inner_width,0.5*inner_width])
+        info_row.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),0),
+        ]))
+        elements.append(info_row)
         elements.append(Spacer(1,8))
 
         # --- Shipment Info (pure) ---
