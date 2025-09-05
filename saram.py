@@ -1,4 +1,4 @@
-# proforma_v12.9.3_fix_row3_right_table10rows_reduced_heights.py
+# proforma_v12.9.3_fix_row3_right_table10rows_reduced_heights_header_multiline_centered.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.9.3 - table padded 10 rows, heights -25%)")
+st.title("📑 Proforma Invoice Generator (v12.9.3 - header multiline centered)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -292,13 +292,28 @@ if agg_df is not None:
         ]))
 
         elements.append(header_table)
-        # no spacer — header bottom line is the top border of the items table
 
         # ---------------------- ITEMS / STYLE TABLE (modified per your request) ----------------------
-        # - increase header height (3-row feel)
-        # - add 10 extra blank rows to the body (actual_rows + 10)
-        # - reduce font sizes for header & body, and make row heights compact/tight
-        header_row = list(agg_df.columns)
+        # - header replaced with multi-line Paragraphs per your spec
+        # - center align entire table (header + body)
+        # - add 10 extra blank rows in body
+        header_labels = [
+            "STYLE NO.",
+            "ITEM DESCRIPTION",
+            "FABRIC TYPE<br/>KNITTED /<br/>WOVEN",
+            "H.S NO<br/>(8digit)",
+            "COMPOSITION OF<br/>MATERIAL",
+            "COUNTRY OF<br/>ORIGIN",
+            "QTY",
+            "UNIT PRICE<br/>FOB",
+            "AMOUNT"
+        ]
+
+        # create Paragraph objects for header with centered alignment
+        header_par_style = ParagraphStyle("tbl_header", parent=normal, alignment=1, fontName="Helvetica-Bold", fontSize=6.5, leading=8)
+        header_row = [Paragraph(lbl, header_par_style) for lbl in header_labels]
+
+        # body rows as before
         body_rows = [list(row) for _, row in agg_df.iterrows()]
         total_row = ["TOTAL","","","","","",f"{int(agg_df['QTY'].sum()):,}","USD",f"{agg_df['AMOUNT'].astype(float).sum():,.2f}"]
 
@@ -315,29 +330,26 @@ if agg_df is not None:
 
         data = [header_row] + body_rows + [total_row]
 
-        # header height increased (3 rows feel); body rows compact/tight (reduced by 25%)
-        header_row_height = 40   # reduced by ~25% from previous 54
-        body_row_height = 12     # reduced by ~25% from previous 16
-        total_row_height = 16    # adjusted accordingly
-
-        # make sure rowHeights list length matches data rows
+        # header height increased (3 rows feel); body rows compact/tight (reduced heights)
+        header_row_height = 40
+        body_row_height = 12
+        total_row_height = 16
         row_heights = [header_row_height] + [body_row_height] * body_count + [total_row_height]
 
-        # reduce font sizes inside style table for compactness
-        header_font_size = 6.5
+        # reduced font sizes for body
         body_font_size = 7
 
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
+
+        # center-align whole table: header + body
         items_style = TableStyle([
             ("LINEBELOW",(0,0),(-1,0),0.25,colors.black),
             ("GRID",(0,1),(-1,-1),0.25,colors.black),
             ("BACKGROUND",(0,0),(-1,0),colors.black),
             ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
-            ("ALIGN",(0,0),(-1,0),"CENTER"),
+            ("ALIGN",(0,0),(-1,-1),"CENTER"),           # center everything (header + body)
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-            ("FONTSIZE",(0,0),(-1,0),header_font_size),
-            ("ALIGN",(0,1),(5,-1),"CENTER"),
-            ("ALIGN",(6,1),(-1,-1),"RIGHT"),
+            ("FONTSIZE",(0,0),(-1,0),6.5),
             ("FONTSIZE",(0,1),(-1,-1),body_font_size),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
             ("LEFTPADDING",(0,0),(-1,-1),3),
