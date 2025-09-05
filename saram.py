@@ -1,4 +1,4 @@
-# proforma_v12.9.3_final_tweaks_v5.py
+# proforma_v12.9.3_final_tweaks_v6_remove_gap.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -163,7 +163,7 @@ if agg_df is not None:
         left_width = sum(col_widths[:3])
         right_width = available_width - left_width
 
-        # Align “origin” for bank answers (kept same)
+        # Align “origin” for bank answers
         origin_left_absolute = sum(col_widths[:5])
         indent_inside_right = origin_left_absolute - left_width
         items_cell_left_padding = 4
@@ -293,7 +293,7 @@ if agg_df is not None:
             ("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
-        # Add three breaks (one extra from previous)
+        # three breaks between the two lines (as requested)
         right_row3_para = Paragraph(
             f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/>"
             f"<b>Remarks:</b> (if any)", row1_normal)
@@ -311,21 +311,15 @@ if agg_df is not None:
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
 
-        # --- (a) Compute left padding so "CURRENCY: USD" starts at QTY column start ---
-        # QTY column index is 6 (0-based). Compute absolute left position of QTY column and convert to padding within right block.
+        # Compute left padding to align "CURRENCY: USD" with QTY col start
         qty_col_index = 6
-        # left edge of style table relative to document is left frame + 0 — but we only need relative offset inside the right block:
-        # position of QTY column left edge relative to the start of the right block = sum(col_widths[:qty_col_index]) - left_width
         qty_left_rel_to_rightblock = sum(col_widths[:qty_col_index]) - left_width
-        # ensure non-negative
         qty_left_rel_to_rightblock = max(0, qty_left_rel_to_rightblock)
-        # we also want a tiny breathing space (2 points)
         padding_needed = qty_left_rel_to_rightblock + 2
 
         currency_para = Paragraph("CURRENCY: USD", row1_normal)
         row4_height = 56
         right_row4_box = Table([[currency_para]], colWidths=[right_width], rowHeights=[row4_height])
-        # apply computed left padding so the text visually lines up with QTY column start
         right_row4_box.setStyle(TableStyle([
             ("ALIGN",(0,0),(0,0),"RIGHT"),
             ("VALIGN",(0,0),(0,0),"BOTTOM"),
@@ -335,7 +329,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(0,0),2),
         ]))
 
-        # Header table -- no spacer after; bottom line touches items table
+        # Header table — ensure bottom padding = 0 on last header row to eliminate gap
         header_table = Table([
             [supplier_stack, right_stack],
             [consignee_box, payment_block],
@@ -353,7 +347,9 @@ if agg_df is not None:
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
+            # extra safe zeroing of paddings on the bottom row to remove any gap
             ("BOTTOMPADDING",(0,3),(1,3),0),
+            ("TOPPADDING",(0,3),(1,3),0),
         ]))
         elements.append(header_table)
 
@@ -387,6 +383,7 @@ if agg_df is not None:
         header_row_h, body_row_h, total_row_h = 40, 12, 16
         row_heights = [header_row_h] + [body_row_h]*(len(body_rows)) + [total_row_h]
 
+        # create items table with explicit zero top padding to ensure no gap
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
         items_style = TableStyle([
             ("GRID",(0,1),(-1,-2),0.25,colors.white),
@@ -399,6 +396,8 @@ if agg_df is not None:
             ("FONTSIZE",(0,1),(-1,-1),7),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
             ("LEFTPADDING",(0,0),(-1,-1),3),("RIGHTPADDING",(0,0),(-1,-1),3),
+            # explicit zeroing of the top padding for the items table to ensure it starts flush under header
+            ("TOPPADDING",(0,0),(-1,-1),0),
         ])
         ncols = len(col_widths)
         for c in range(ncols-1):
@@ -438,8 +437,11 @@ if agg_df is not None:
         data[total_idx][8] = ""
         data[total_idx][5] = f"{int(total_qty):,}"; data[total_idx][6] = ""
 
+        # recreate to apply data updates
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
         items_table.setStyle(items_style)
+
+        # append items table immediately after header (no spacer)
         elements.append(items_table)
 
         # Amount in words
@@ -460,7 +462,7 @@ if agg_df is not None:
         ]))
         elements.append(terms_table)
 
-        # Signature (single small spacer below)
+        # Signature & footer
         sig_img = "sarsign.png"
         try:
             sign_img = Image(sig_img, width=220, height=80)
@@ -476,7 +478,6 @@ if agg_df is not None:
         elements.append(sign_row)
         elements.append(Spacer(1,8))
 
-        # Footer: left normal, right BOLD (user requested bold)
         left_footer = Paragraph("Signed by ……………………. (Affix Stamp here)", ParagraphStyle("fl", parent=normal, fontSize=6))
         right_footer = Paragraph("for RNA Resources Group Ltd-Landmark (Babyshop)",
                                  ParagraphStyle("fr", parent=normal, fontSize=6, alignment=2, fontName="Helvetica-Bold"))
@@ -489,6 +490,7 @@ if agg_df is not None:
         ]))
         elements.append(footer_row)
 
+        # Outer wrapper
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
         outer_table.setStyle(TableStyle([
             ("BOX",(0,0),(-1,-1),0.75,colors.black),
