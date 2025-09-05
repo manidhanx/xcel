@@ -1,4 +1,3 @@
-# proforma_v12.6.0.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -32,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.6.0)")
+st.title("📑 Proforma Invoice Generator (v12.6.1)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -139,10 +138,10 @@ if agg_df is not None:
         styles=getSampleStyleSheet()
         normal=styles["Normal"]
 
-        # typography tweaks (company single-line uses smaller font so it fits)
+        # typography tweaks
         title_style = ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)
         supplier_label = ParagraphStyle("supplier_label", parent=normal, fontName="Helvetica-Bold", fontSize=8)
-        # single-line company (both parts same size, slightly smaller so single line fits)
+        # company single-line smaller so full name fits
         supplier_company = ParagraphStyle("supplier_company", parent=normal, fontName="Helvetica-Bold", fontSize=7)
         supplier_small_label = ParagraphStyle("supplier_small_label", parent=normal, fontName="Helvetica", fontSize=6)
         supplier_small_value = ParagraphStyle("supplier_small_value", parent=normal, fontName="Helvetica", fontSize=6)
@@ -158,7 +157,7 @@ if agg_df is not None:
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # proportions used previously (keeps table alignment consistent)
+        # proportions used previously
         style_prop = 0.125
         item_prop = 0.185
         fabric_prop = 0.12
@@ -166,7 +165,7 @@ if agg_df is not None:
         left_width = table_width * (style_prop + item_prop + fabric_prop)
         right_width = inner_width - left_width
 
-        # compute indent so payment answers begin at ORIGIN column left edge (keeps payment alignment)
+        # compute indent so payment answers begin at ORIGIN column left edge
         before_origin_prop = style_prop + item_prop + fabric_prop + 0.10 + 0.15
         origin_left_absolute = table_width * before_origin_prop
         indent_inside_right = origin_left_absolute - left_width
@@ -218,8 +217,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
 
-        # ---------------- ROW 1 RIGHT - top-aligned, two-row nested with divider under PI row ----------------
-        # right_top: No. & date of PI (single-line)
+        # ---------------- ROW 1 RIGHT - top-aligned, two-row nested with divider under PI ----------------
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
         right_top.setStyle(TableStyle([
@@ -228,11 +226,9 @@ if agg_df is not None:
             ("TOPPADDING",(0,0),(-1,-1),2),
             ("BOTTOMPADDING",(0,0),(-1,-1),2),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
-            # draw a thin line under this top row
             ("LINEBELOW",(0,0),(0,0),0.6,colors.black)
         ]))
 
-        # right_bottom: order reference / buyer / brand
         right_bottom_para = Paragraph(
             f"<b>Landmark order Reference:</b> {order_no}<br/>"
             f"<b>Buyer Name:</b> {buyer_name}<br/>"
@@ -248,14 +244,13 @@ if agg_df is not None:
         ]))
 
         right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width], rowHeights=[None, None])
-        # explicitly top-align the right column in the header table later; keep this stack minimal
         right_stack.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
         ]))
 
-        # ---------------- ROW 2 (Consignee left, Payment right) ----------------
+        # ---------------- ROW 2 (Consignee left, Payment terms right) ----------------
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([
@@ -268,8 +263,6 @@ if agg_df is not None:
 
         # Payment terms block: label + spacer + values aligned to ORIGIN start
         label_col_w = table_width * 0.08
-        spacer_w = indent_inside_right = max(0, (style_prop + item_prop + fabric_prop + 0.10 + 0.15) * table_width - left_width) if 'table_width' in locals() else 0
-        # (compute value_col_w safely)
         spacer_w = indent_inside_right
         value_col_w = right_width - label_col_w - spacer_w - 6
         if value_col_w < 50:
@@ -335,15 +328,16 @@ if agg_df is not None:
 
         # assemble header table (4 rows)
         header_table = Table([
-            [supplier_stack, right_stack],   # row 1: supplier left, right single block with top divider under PI
-            [consignee_box, payment_box],
-            [left_row3_box, right_row3_box],
-            [left_row4_box, right_row4_box]
+            [supplier_stack, right_stack],   # row 1
+            [consignee_box, payment_box],    # row 2
+            [left_row3_box, right_row3_box], # row 3
+            [left_row4_box, right_row4_box]  # row 4
         ], colWidths=[left_width, right_width])
 
+        # KEY: force both columns to top-align across rows so right_stack is pinned to top
         header_table.setStyle(TableStyle([
-            ("VALIGN",(0,0),(0,3),"TOP"),
-            ("VALIGN",(1,0),(1,3),"TOP"),
+            ("VALIGN",(0,0),(0,3),"TOP"),     # left column top
+            ("VALIGN",(1,0),(1,3),"TOP"),     # right column top  <-- this enforces top alignment for whole right column
             ("LINEAFTER",(0,0),(0,3),0.75,colors.black),
             ("LINEBELOW",(0,0),(1,0),0.35,colors.black),
             ("LINEBELOW",(0,1),(1,1),0.35,colors.black),
