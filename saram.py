@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.3.4 Pure Reference)")
+st.title("📑 Proforma Invoice Generator (v12.3.5 Pure Reference)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -160,10 +160,14 @@ if agg_df is not None:
         style_col_width = table_width * style_prop
         supplier_inner_col2 = left_width - style_col_width
 
-        # --- Build header_section table: title row, supplier/payment row, consignee/shipment row ---
+        # --- Build header_section with required row order:
+        # row0: title (spans both)
+        # row1: supplier (left) | empty (right)
+        # row2: consignee (left) | payment_terms (right)  <-- begin same row
+        # row3: shipment (span right or split)  (kept split to meet divider)
         title_para = Paragraph("<b>PROFORMA INVOICE</b>", ParagraphStyle("title", parent=normal, alignment=1, fontSize=7))
 
-        # Supplier block: label on same horizontal baseline with company name on same (or next) line as requested earlier:
+        # Supplier block: single-line "Supplier Name:" + company on same line (attempt to keep single line)
         supplier_lines = [
             [Paragraph("Supplier Name:", label_small), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],
             [Paragraph("Address:", label_small), Paragraph("6, Picaso Bithi, Kolkata - 700017", value_small)],
@@ -178,32 +182,82 @@ if agg_df is not None:
             ("TOPPADDING",(0,0),(-1,-1),1),
             ("BOTTOMPADDING",(0,0),(-1,-1),1),
         ]))
-
         supplier_box = Table([[supplier_inner]], colWidths=[left_width])
-        supplier_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),
-                                          ("RIGHTPADDING",(0,0),(-1,-1),0),
-                                          ("TOPPADDING",(0,0),(-1,-1),0),
-                                          ("BOTTOMPADDING",(0,0),(-1,-1),0),]))
+        supplier_box.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),0),
+        ]))
 
-        # Payment Terms block (right, row1)
-        payment_lines = f"<b>Payment Terms:</b><br/>{payment_term}<br/><b>PI No.:</b> {pi_no}<br/><b>Buyer:</b> {buyer_name}"
-        payment_para = Paragraph(payment_lines, normal)
-        payment_box = Table([[payment_para]], colWidths=[right_width])
-        payment_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),
-                                        ("RIGHTPADDING",(0,0),(-1,-1),6),
-                                        ("TOPPADDING",(0,0),(-1,-1),6),
-                                        ("BOTTOMPADDING",(0,0),(-1,-1),6),]))
-
-        # Consignee block moved to LEFT below supplier (row2, left)
+        # Consignee block (left, row2)
         consignee_lines = f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}"
         consignee_para = Paragraph(consignee_lines, normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
-        consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),
-                                          ("RIGHTPADDING",(0,0),(-1,-1),2),
-                                          ("TOPPADDING",(0,0),(-1,-1),4),
-                                          ("BOTTOMPADDING",(0,0),(-1,-1),4),]))
+        consignee_box.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),2),
+            ("RIGHTPADDING",(0,0),(-1,-1),2),
+            ("TOPPADDING",(0,0),(-1,-1),4),
+            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ]))
 
-        # shipment (placed in right column row2 to keep grid intact or can span both; we'll place in right column)
+        # Payment Terms block (right, row2) — with two blank lines after "Payment Term:" then bank details
+        # We'll put labels on left, answers on right; answers start at left edge of right column (i.e. HS NO start)
+        bank_labels = [
+            "Beneficiary :-",
+            "Account No :-",
+            "BANK'S NAME :-",
+            "BANK ADDRESS :-",
+            "",  # for address continuation
+            "SWIFT CODE :-",
+            "BANK CODE :-"
+        ]
+        bank_values = [
+            "SAR APPARELS INDIA PVT.LTD",
+            "2112819952",
+            "KOTAK MAHINDRA BANK LTD",
+            "2 BRABOURNE ROAD, GOVIND BHAVAN, GROUND FLOOR, KOLKATA-700001",
+            "",  # address continuation empty row (keeps formatting)
+            "KKBKINBBCPC",
+            "0323"
+        ]
+
+        # Build inner bank table with small label column and a value column that begins at HS NO (i.e., left edge of right column)
+        label_col_w = table_width * 0.08   # narrow label column inside payment box
+        value_col_w = right_width - label_col_w - 6  # remaining space; small correction to avoid overflow
+
+        # Payment header + two blank lines
+        payment_header = Paragraph("<b>Payment Term:</b>", normal)
+        blank_para = Paragraph("<br/>", normal)
+
+        bank_rows = []
+        bank_rows.append([payment_header, ""])   # Payment Term: (we leave second cell blank)
+        bank_rows.append([blank_para, ""])       # blank line 1
+        bank_rows.append([blank_para, ""])       # blank line 2
+
+        # then bank detail rows with labels and values (answers left aligned at start of value_col)
+        for lbl, val in zip(bank_labels, bank_values):
+            bank_rows.append([Paragraph(lbl, label_small), Paragraph(val, value_small)])
+
+        bank_inner = Table(bank_rows, colWidths=[label_col_w, value_col_w])
+        bank_inner.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),2),
+            ("RIGHTPADDING",(0,0),(-1,-1),2),
+            ("TOPPADDING",(0,0),(-1,-1),1),
+            ("BOTTOMPADDING",(0,0),(-1,-1),1),
+        ]))
+
+        payment_box = Table([[bank_inner]], colWidths=[right_width])
+        # ensure no left padding so values start at HS NO left edge (the right column left edge)
+        payment_box.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("TOPPADDING",(0,0),(-1,-1),2),
+            ("BOTTOMPADDING",(0,0),(-1,-1),2),
+        ]))
+
+        # Shipment row (row3) - keep split so divider meets items table
         shipment_para_left = Paragraph(f"<b>Loading Country:</b> {made_in}<br/><b>Agreed Shipment Date:</b> {ship_date}", normal)
         shipment_para_right = Paragraph(f"<b>Port of Loading:</b> {loading_port}<br/><b>Description of goods:</b> {order_of}", normal)
         shipment_left_box = Table([[shipment_para_left]], colWidths=[left_width])
@@ -211,23 +265,19 @@ if agg_df is not None:
         shipment_left_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
         shipment_right_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
 
-        # header_section arrangement:
-        # row0: title (spans both)
-        # row1: supplier_box (left) | payment_box (right)
-        # row2: consignee_box (left) | shipment_right_box (right)  <-- shipment left/right split to keep divider alignment
+        # Compose header_section with exact requested ordering
         header_section = Table([
-            [title_para, ""],
-            [supplier_box, payment_box],
-            [consignee_box, shipment_right_box]
+            [Paragraph("<b>PROFORMA INVOICE</b>", ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)), ""],
+            [supplier_box, ""],
+            [consignee_box, payment_box],
+            [shipment_left_box, shipment_right_box]
         ], colWidths=[left_width, right_width])
+
         header_section.setStyle(TableStyle([
-            ("SPAN",(0,0),(1,0)),               # title spans both cols
+            ("SPAN",(0,0),(1,0)),                  # title spans across top
             ("ALIGN",(0,0),(1,0),"CENTER"),
-            ("VALIGN",(0,0),(1,0),"MIDDLE"),
-            # horizontal line below title to visually anchor divider start
-            ("LINEBELOW",(0,0),(1,0),0.75,colors.black),
-            # vertical divider through rows 1..2 (so it starts under the title and goes through supplier/payment/consignee/shipment area)
-            ("LINEAFTER",(0,1),(0,2),0.75,colors.black),
+            ("LINEBELOW",(0,0),(1,0),0.75,colors.black),  # horizontal rule under title (divider starts here)
+            ("LINEAFTER",(0,1),(0,3),0.75,colors.black),  # vertical divider through rows 1..3
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),
