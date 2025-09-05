@@ -1,4 +1,4 @@
-# proforma_v12.9.3_totals_dividers_white_rows.py
+# proforma_v12.9.3_final_table_adjusts.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -334,7 +334,8 @@ if agg_df is not None:
         # Build data: header + body + total row (we will make spans on the total row)
         data = [header_row] + body_rows
 
-        total_row = ["TOTAL", "", "", "", "", "", f"{int(total_qty):,}", None, None]
+        # total row now: TOTAL spans 0..4, qty spans 5..6, USD spans 7..8
+        total_row = ["TOTAL", "", "", "", "", f"{int(total_qty):,}", "", None, None]  # we'll place USD in index 7
         data.append(total_row)
 
         # row heights
@@ -346,10 +347,12 @@ if agg_df is not None:
         # create table
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
 
-        # base style: body grid is WHITE (so rows look divider-less)
+        # base style:
         items_style = TableStyle([
-            ("GRID",(0,1),(-1,-2),0.25,colors.white),   # body dividers white
-            ("LINEBELOW",(0,0),(-1,0),0.5,colors.black),    # underline header
+            # body horizontal lines white (so body rows look divider-less horizontally)
+            ("GRID",(0,1),(-1,-2),0.25,colors.white),
+            # header underline
+            ("LINEBELOW",(0,0),(-1,0),0.5,colors.black),
             ("BACKGROUND",(0,0),(-1,0),colors.white),
             ("TEXTCOLOR",(0,0),(-1,0),colors.black),
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
@@ -361,52 +364,64 @@ if agg_df is not None:
             ("RIGHTPADDING",(0,0),(-1,-1),3),
         ])
 
-        # Underline each header cell (reinforce)
+        # Make header vertical dividers black (LINEAFTER for header row)
         ncols = len(col_widths)
-        for c in range(ncols):
-            items_style.add("LINEBELOW",(c,0),(c,0),0.5,colors.black)
+        for c in range(ncols - 1):
+            items_style.add("LINEAFTER",(c,0),(c,0),0.5,colors.black)
 
-        # total row index
+        # Column vertical dividers in body: set LINEAFTER black for rows 1..(total_row_idx-1)
         total_row_idx = len(data) - 1
+        for c in range(ncols - 1):
+            items_style.add("LINEAFTER",(c,1),(c,total_row_idx-1),0.25,colors.black)
 
-        # Span columns 0..5 into one cell for TOTAL label
-        items_style.add("SPAN",(0,total_row_idx),(5,total_row_idx))
-        items_style.add("ALIGN",(0,total_row_idx),(5,total_row_idx),"CENTER")
-        items_style.add("FONTNAME",(0,total_row_idx),(5,total_row_idx),"Helvetica-Bold")
-        items_style.add("FONTSIZE",(0,total_row_idx),(5,total_row_idx),8)
-        items_style.add("VALIGN",(0,total_row_idx),(5,total_row_idx),"MIDDLE")
+        # Remove/hide the horizontal line below the first value row (make white)
+        # First value row is row index 1 — make its LINEBELOW white
+        items_style.add("LINEBELOW",(0,1),(-1,1),0.25,colors.white)
 
-        # Column 6 stays with quantity; center it vertically & horizontally
-        items_style.add("ALIGN",(6,total_row_idx),(6,total_row_idx),"CENTER")
-        items_style.add("FONTNAME",(6,total_row_idx),(6,total_row_idx),"Helvetica-Bold")
-        items_style.add("FONTSIZE",(6,total_row_idx),(6,total_row_idx),7)
-        items_style.add("VALIGN",(6,total_row_idx),(6,total_row_idx),"MIDDLE")
+        # Now add spans for total row according to new plan:
+        #  - TOTAL spans 0..4
+        items_style.add("SPAN",(0,total_row_idx),(4,total_row_idx))
+        items_style.add("ALIGN",(0,total_row_idx),(4,total_row_idx),"CENTER")
+        items_style.add("FONTNAME",(0,total_row_idx),(4,total_row_idx),"Helvetica-Bold")
+        items_style.add("FONTSIZE",(0,total_row_idx),(4,total_row_idx),8)
+        items_style.add("VALIGN",(0,total_row_idx),(4,total_row_idx),"MIDDLE")
 
-        # Merge the last two columns (7..8) to show USD total; place text in col 7 cell
+        #  - merge qty cell: 5..6 and center the qty
+        items_style.add("SPAN",(5,total_row_idx),(6,total_row_idx))
+        items_style.add("ALIGN",(5,total_row_idx),(6,total_row_idx),"CENTER")
+        items_style.add("FONTNAME",(5,total_row_idx),(6,total_row_idx),"Helvetica-Bold")
+        items_style.add("FONTSIZE",(5,total_row_idx),(6,total_row_idx),7)
+        items_style.add("VALIGN",(5,total_row_idx),(6,total_row_idx),"MIDDLE")
+
+        #  - merge last two columns for USD total and center the USD text
         items_style.add("SPAN",(7,total_row_idx),(8,total_row_idx))
-        items_style.add("ALIGN",(7,total_row_idx),(8,total_row_idx),"RIGHT")
+        items_style.add("ALIGN",(7,total_row_idx),(8,total_row_idx),"CENTER")   # centered as requested
         items_style.add("FONTNAME",(7,total_row_idx),(8,total_row_idx),"Helvetica-Bold")
         items_style.add("FONTSIZE",(7,total_row_idx),(8,total_row_idx),7)
-        items_style.add("LINEABOVE",(7,total_row_idx),(8,total_row_idx),0.5,colors.black)
+        # make a clear horizontal line above the total row (black)
+        items_style.add("LINEABOVE",(0,total_row_idx),(-1,total_row_idx),0.5,colors.black)
 
-        # Add black vertical lines at:
-        #  - after column 5 at the total row (end of TOTAL merged cell)
-        #  - after column 6 at the total row (end of QTY cell)
-        items_style.add("LINEAFTER",(5,total_row_idx),(5,total_row_idx),0.6,colors.black)
+        # ensure vertical black separators at the end of the TOTAL merged cell (after col 4)
+        # and at the end of the merged qty (after col 6)
+        items_style.add("LINEAFTER",(4,total_row_idx),(4,total_row_idx),0.6,colors.black)
         items_style.add("LINEAFTER",(6,total_row_idx),(6,total_row_idx),0.6,colors.black)
 
-        # ensure the top of the body (line under header) is black:
-        items_style.add("LINEBELOW",(0,1),(-1,1),0.25,colors.black)
+        # Also ensure header top horizontal line exists (reinforce)
+        items_style.add("LINEABOVE",(0,0),(-1,0),0.25,colors.black)
 
         items_table.setStyle(items_style)
 
-        # place actual USD total into first cell of last span and ensure empty trailing cell
+        # place actual USD total into first cell of last span and ensure trailing cell empty
         usd_total_str = f"USD {total_amount:,.2f}"
         data[total_row_idx][7] = usd_total_str
         data[total_row_idx][8] = ""
 
         # ensure TOTAL label present
         data[total_row_idx][0] = "TOTAL"
+
+        # Put qty in merged 5..6 first cell
+        data[total_row_idx][5] = f"{int(total_qty):,}"
+        data[total_row_idx][6] = ""
 
         # recreate table to ensure data updates are used
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
