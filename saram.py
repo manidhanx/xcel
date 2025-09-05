@@ -1,4 +1,4 @@
-# proforma_v12.9.3_fix_row3_right.py
+# proforma_v12.9.4_row3row4_and_table_heights.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.9.3)")
+st.title("📑 Proforma Invoice Generator (v12.9.4)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -136,7 +136,7 @@ if agg_df is not None:
         styles=getSampleStyleSheet()
         normal=styles["Normal"]
 
-        # paragraph styles (kept same)
+        # paragraph styles
         title_style = ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)
         supplier_label = ParagraphStyle("supplier_label", parent=normal, fontName="Helvetica-Bold", fontSize=8)
         supplier_company = ParagraphStyle("supplier_company", parent=normal, fontName="Helvetica-Bold", fontSize=7)
@@ -154,7 +154,7 @@ if agg_df is not None:
         content_width = A4[0] - 110
         available_width = content_width - 0.5
 
-        # column proportions (same proportions you've been using)
+        # column proportions (same proportions)
         props = [0.125, 0.185, 0.12, 0.10, 0.15, 0.08, 0.07, 0.08, 0.09]
         total_prop = sum(props)
         props = [p/total_prop for p in props]
@@ -166,7 +166,6 @@ if agg_df is not None:
         left_width = sum(col_widths[:3])
         right_width = available_width - left_width
 
-        # compute spacer_to_origin (for aligning bank answers ':-' near ORIGIN)
         origin_left_absolute = sum(col_widths[:5])
         indent_inside_right = origin_left_absolute - left_width
         items_cell_left_padding = 4
@@ -181,7 +180,6 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        # supplier (left breathing for rows 1 & 2)
         supplier_title = Table([
             [Paragraph("Supplier Name:", supplier_label)],
             [Paragraph("SAR APPARELS INDIA PVT.LTD.", supplier_company)]
@@ -198,7 +196,6 @@ if agg_df is not None:
         supplier_stack = Table([[supplier_title],[supplier_contact]], colWidths=[left_width])
         supplier_stack.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),6)]))
 
-        # right blocks (PI / order reference)
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
         right_top.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),3),("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP"),("LINEBELOW",(0,0),(0,0),0.6,colors.black)]))
@@ -210,7 +207,6 @@ if agg_df is not None:
         right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width])
         right_stack.setStyle(TableStyle([("VALIGN",(0,0),(0,1),"TOP"),("LEFTPADDING",(0,0),(0,1),2),("RIGHTPADDING",(0,0),(0,1),0)]))
 
-        # consignee and payment blocks
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", row1_normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),("VALIGN",(0,0),(-1,-1),"TOP")]))
@@ -254,17 +250,12 @@ if agg_df is not None:
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # ---------- FIX: ROW 3 RIGHT BLOCK (removed duplicate 'Loading Country' and reordered) ----------
-        # Now shows:
-        #   L/C Advising Bank: (If applicable)   <-- first
-        #   Remarks: (if any)                     <-- last
+        # ROW3 RIGHT: first line L/C Advising Bank, then three blank lines, then Remarks (last)
         right_row3_para = Paragraph(
-            f"<b>L/C Advising Bank:</b> (If applicable)<br/>"
+            f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/><br/>"
             f"<b>Remarks:</b> (if any)",
             row1_normal
         )
-        # ---------------------------------------------------------------------------------------------
-
         right_row3_box = Table([[right_row3_para]], colWidths=[right_width])
         right_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
@@ -272,17 +263,24 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
+        # ROW4 RIGHT: bottom-right align CURRENCY: USD
         right_row4_para = Paragraph("CURRENCY: USD", row1_normal)
         right_row4_box = Table([[right_row4_para]], colWidths=[right_width])
-        right_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        right_row4_box.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),4),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
+            ("VALIGN",(0,0),(-1,-1),"BOTTOM"),     # <-- vertical bottom
+            ("ALIGN",(0,0),(-1,-1),"RIGHT")        # <-- horizontal right
+        ]))
 
-        # assemble header with bottom dividing line enabled to sit on top of items
+        # assemble header — keep header bottom line enabled so it sits on top of items
+        # increase first two header rows' heights slightly so the header looks visually taller (3-line feel for style table's header)
         header_table = Table([
             [supplier_stack, right_stack],
             [consignee_box, payment_block],
             [left_row3_box, right_row3_box],
             [left_row4_box, right_row4_box]
-        ], colWidths=[left_width, right_width], rowHeights=[None, None, 56, 56])
+        ], colWidths=[left_width, right_width], rowHeights=[28, 28, 64, 64])  # first two rows slightly taller; row3/4 increased
 
         header_table.setStyle(TableStyle([
             ("VALIGN",(0,0),(1,3),"TOP"),
@@ -298,24 +296,41 @@ if agg_df is not None:
         ]))
 
         elements.append(header_table)
-        # no spacer — header bottom line is the top border of the items table
+        # no spacer — header bottom line is top border of items table
 
-        # items table (columns sum to available_width)
+        # ---------------- items table ----------------
         data=[list(agg_df.columns)]
         for _,row in agg_df.iterrows(): data.append(list(row))
         total_qty = agg_df["QTY"].sum()
         total_amount = agg_df["AMOUNT"].astype(float).sum()
         data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
 
-        items_table = Table(data, colWidths=col_widths, repeatRows=1)
+        # enforce minimum body row count (12) so table area is visually large enough for printing
+        actual_body_rows = len(data) - 1  # excluding header row
+        min_body_rows = 12
+        body_rows_needed = max(min_body_rows, actual_body_rows)
+
+        # header row height (bigger to create 3-line header feel)
+        header_row_height = 36
+        body_row_height = 20
+        # construct rowHeights list: header + body_rows_needed
+        row_heights = [header_row_height] + [body_row_height] * body_rows_needed
+
+        # If actual data has more rows than body_rows_needed, report that ReportLab will auto-expand rows for actual data.
+        # For Table we must pass exactly the number of heights equal to rows in table; so if actual_body_rows > min, override:
+        if actual_body_rows > min_body_rows:
+            # we have actual rows more than min; set row_heights to match actual length: header + actual_body_rows
+            row_heights = [header_row_height] + [body_row_height] * actual_body_rows
+
+        items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
         items_style = TableStyle([
-            ("LINEBELOW",(0,0),(-1,0),0.25,colors.black),
+            ("LINEBELOW",(0,0),(-1,0),0.25,colors.black),   # header row bottom thin
             ("GRID",(0,1),(-1,-1),0.25,colors.black),
             ("BACKGROUND",(0,0),(-1,0),colors.black),
             ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
             ("ALIGN",(0,0),(-1,0),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-            ("FONTSIZE",(0,0),(-1,0),7),
+            ("FONTSIZE",(0,0),(-1,0),8),
             ("ALIGN",(0,1),(5,-1),"CENTER"),
             ("ALIGN",(6,1),(-1,-1),"RIGHT"),
             ("FONTSIZE",(0,1),(-1,-1),8),
@@ -329,12 +344,13 @@ if agg_df is not None:
 
         elements.append(items_table)
 
-        # amount words, terms & signature (unchanged)
+        # amount in words
         amount_words = amount_to_words(total_amount)
         words_table = Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]], colWidths=[available_width])
         words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
         elements.append(words_table)
 
+        # terms & signature
         terms_table = Table([[Paragraph("Terms & Conditions (if any):", normal)]], colWidths=[available_width])
         terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),("FONTSIZE",(0,0),(-1,-1),8),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
         elements.append(terms_table)
