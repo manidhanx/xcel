@@ -1,4 +1,4 @@
-# proforma_v12.9.3_fix_row3_right_table10rows_reduced_heights_header_multiline_centered_hdrwhite_rowdiv_blank.py
+# proforma_v12.9.3_fix_table_header_dividers_total_white_lineabove.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.9.3 - header white, titles black, row dividers blank)")
+st.title("📑 Proforma Invoice Generator")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -136,7 +136,7 @@ if agg_df is not None:
         styles=getSampleStyleSheet()
         normal=styles["Normal"]
 
-        # paragraph styles (kept same)
+        # paragraph styles
         title_style = ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)
         supplier_label = ParagraphStyle("supplier_label", parent=normal, fontName="Helvetica-Bold", fontSize=8)
         supplier_company = ParagraphStyle("supplier_company", parent=normal, fontName="Helvetica-Bold", fontSize=7)
@@ -154,7 +154,7 @@ if agg_df is not None:
         content_width = A4[0] - 110
         available_width = content_width - 0.5
 
-        # column proportions (same proportions you've been using)
+        # column proportions
         props = [0.125, 0.185, 0.12, 0.10, 0.15, 0.08, 0.07, 0.08, 0.09]
         total_prop = sum(props)
         props = [p/total_prop for p in props]
@@ -166,7 +166,7 @@ if agg_df is not None:
         left_width = sum(col_widths[:3])
         right_width = available_width - left_width
 
-        # compute spacer_to_origin (for aligning bank answers ':-' near ORIGIN)
+        # spacer calculation for bank block alignment (keeps existing logic)
         origin_left_absolute = sum(col_widths[:5])
         indent_inside_right = origin_left_absolute - left_width
         items_cell_left_padding = 4
@@ -174,14 +174,13 @@ if agg_df is not None:
         extra_left_shift = col_widths[6] * 3
         spacer_to_origin = max(0, indent_inside_right_corrected - extra_left_shift)
 
-        # --- Header / blocks ---
+        # --- Header / blocks (unchanged structure) ---
         elements.append(Table([[Paragraph("PROFORMA INVOICE", title_style)]], colWidths=[available_width], style=[
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("TOPPADDING",(0,0),(-1,-1),4),
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        # supplier (left breathing for rows 1 & 2)
         supplier_title = Table([
             [Paragraph("Supplier Name:", supplier_label)],
             [Paragraph("SAR APPARELS INDIA PVT.LTD.", supplier_company)]
@@ -198,7 +197,6 @@ if agg_df is not None:
         supplier_stack = Table([[supplier_title],[supplier_contact]], colWidths=[left_width])
         supplier_stack.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),6)]))
 
-        # right blocks (PI / order reference)
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
         right_top.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),3),("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),("VALIGN",(0,0),(-1,-1),"TOP"),("LINEBELOW",(0,0),(0,0),0.6,colors.black)]))
@@ -210,7 +208,6 @@ if agg_df is not None:
         right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width])
         right_stack.setStyle(TableStyle([("VALIGN",(0,0),(0,1),"TOP"),("LEFTPADDING",(0,0),(0,1),2),("RIGHTPADDING",(0,0),(0,1),0)]))
 
-        # consignee and payment blocks
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", row1_normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),("VALIGN",(0,0),(-1,-1),"TOP")]))
@@ -249,7 +246,6 @@ if agg_df is not None:
         payment_block = Table([[pay_term_tbl],[blank_row],[bank_heading_tbl],[bank_inner]], colWidths=[right_width])
         payment_block.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),2),("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
 
-        # ROW3 & ROW4 blocks
         left_row3_para = Paragraph(f"<b>Loading Country:</b> {made_in or ''}<br/><b>Port of Loading:</b> {loading_port or ''}<br/><b>Agreed Shipment Date:</b> {ship_date or ''}", row1_normal)
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
@@ -270,7 +266,6 @@ if agg_df is not None:
         right_row4_box = Table([[right_row4_para]], colWidths=[right_width])
         right_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # assemble header with bottom dividing line enabled to sit on top of items
         header_table = Table([
             [supplier_stack, right_stack],
             [consignee_box, payment_block],
@@ -293,7 +288,7 @@ if agg_df is not None:
 
         elements.append(header_table)
 
-        # ---------------------- ITEMS / STYLE TABLE (header white, titles black, row dividers blank) ----------------------
+        # ---------------------- ITEMS / STYLE TABLE (header vertical dividers + total white) ----------------------
         header_labels = [
             "STYLE NO.",
             "ITEM DESCRIPTION",
@@ -332,18 +327,12 @@ if agg_df is not None:
 
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
 
-        # Strategy:
-        # 1) draw a black vertical+horizontal grid for the body (so we get column lines)
-        # 2) draw a black underline for the header
-        # 3) overwrite all horizontal lines in the body to WHITE so only vertical column dividers remain visible
+        # Start with body GRID (gives vertical separators in body)
         items_style = TableStyle([
-            # initial grid for body (gives vertical separators)
             ("GRID",(0,1),(-1,-1),0.25,colors.black),
-            # header underline strong
-            ("LINEBELOW",(0,0),(-1,0),0.35,colors.black),
-            # make header background white and text black
-            ("BACKGROUND",(0,0),(-1,0),colors.white),
-            ("TEXTCOLOR",(0,0),(-1,0),colors.black),
+            ("LINEBELOW",(0,0),(-1,0),0.35,colors.black),    # header underline
+            ("BACKGROUND",(0,0),(-1,0),colors.white),        # header bg white
+            ("TEXTCOLOR",(0,0),(-1,0),colors.black),         # header text black
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
             ("FONTSIZE",(0,0),(-1,0),6.5),
@@ -352,19 +341,27 @@ if agg_df is not None:
             ("LEFTPADDING",(0,0),(-1,-1),3),
             ("RIGHTPADDING",(0,0),(-1,-1),3),
         ])
-        # overwrite horizontal lines in body to white (effectively blanking row dividers)
-        items_style.add("LINEBELOW",(0,1),(-1,-1),0.25,colors.white)
 
-        # keep total row styling
+        # blank horizontal dividers in body (keep verticals)
+        items_style.add("LINEBELOW",(0,1),(-1,-2),0.25,colors.white)  # rows except last (total) blanked
+        # ensure the line below the last body row (just above total) is black (so total top line is visible)
+        items_style.add("LINEBELOW",(0, len(data)-2),(-1, len(data)-2),0.35,colors.black)
+
+        # Make TOTAL row white and add strong black line above TOTAL
+        items_style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.white)
         items_style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
-        items_style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.lightgrey)
+        items_style.add("LINEABOVE",(0,len(data)-1),(-1,len(data)-1),0.35,colors.black)
+
+        # Draw vertical separators on header row explicitly so header shows column dividers
+        ncols = len(col_widths)
+        for col_idx in range(ncols - 1):
+            items_style.add("LINEAFTER",(col_idx,0),(col_idx,0),0.25,colors.black)
 
         items_table.setStyle(items_style)
-        # --------------------------------------------------------------------------------------------
 
         elements.append(items_table)
 
-        # amount words, terms & signature (unchanged)
+        # amount words, terms & signature
         total_amount = agg_df["AMOUNT"].astype(float).sum()
         amount_words = amount_to_words(total_amount)
         words_table = Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]], colWidths=[available_width])
