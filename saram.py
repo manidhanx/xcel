@@ -1,4 +1,4 @@
-# proforma_v12.9.3_footer_final_tweaks.py
+# proforma_v12.9.3_final_tweaks_v2.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -150,13 +150,13 @@ if agg_df is not None:
         label_small=ParagraphStyle("label_small", parent=normal, fontName="Helvetica-Bold", fontSize=7)
         value_small=ParagraphStyle("value_small", parent=normal, fontName="Helvetica", fontSize=7, leading=8)
 
-        # amount-in-words style increased by 25% (5 -> 6)
+        # amount-in-words style increased by 25% (6 -> 7.5)
         amount_words_style = ParagraphStyle(
             "amount_words_style",
             parent=normal,
             fontName="Helvetica-Bold",
-            fontSize=6,   # increased ~25% from previous 5
-            leading=7,
+            fontSize=7.5,   # increased 25% from 6
+            leading=8.5,
             alignment=0
         )
 
@@ -414,6 +414,8 @@ if agg_df is not None:
 
         # make a clear horizontal line above the total row (black)
         items_style.add("LINEABOVE",(0,total_row_idx),(-1,total_row_idx),0.5,colors.black)
+        # **new**: make the horizontal line immediately BELOW the total row black as requested
+        items_style.add("LINEBELOW",(0,total_row_idx),(-1,total_row_idx),0.5,colors.black)
 
         # ensure vertical black separators after col4 and after col6 in total row
         items_style.add("LINEAFTER",(4,total_row_idx),(4,total_row_idx),0.6,colors.black)
@@ -441,10 +443,10 @@ if agg_df is not None:
 
         elements.append(items_table)
 
-        # ------------------ AMOUNT IN WORDS (bigger + bold + 3 spaces after TOTAL) ---------------
+        # ------------------ AMOUNT IN WORDS (increased 25% -> 7.5) ---------------
         amount_words = amount_to_words(total_amount)
         words_para = Paragraph(f"<b>TOTAL&nbsp;&nbsp;&nbsp;US DOLLAR {amount_words}</b>", amount_words_style)
-        # Hide inner grid lines below this block by not using any inner GRIDs; use white grid to be safe
+        # Hide inner grid lines beneath words block (so rows below appear white) — outer frame kept below
         words_table = Table([[words_para]], colWidths=[available_width])
         words_table.setStyle(TableStyle([
             ("GRID",(0,0),(-1,-1),0.25,colors.white),
@@ -464,18 +466,16 @@ if agg_df is not None:
         ]))
         elements.append(terms_table)
 
-        # two small line breaks spacer
-        elements.append(Spacer(1,12))
+        # one small line break spacer ABOVE signature (reduced from two to one)
         elements.append(Spacer(1,12))
 
-        # ------------------ SIGN IMAGE (left aligned now) ------------
+        # ------------------ SIGN IMAGE (left aligned) ------------
         sig_img = "sarsign.png"
         try:
-            sign_img = Image(sig_img, width=220, height=80)  # keep bigger
+            sign_img = Image(sig_img, width=220, height=80)
         except Exception:
             sign_img = Paragraph("", normal)
 
-        # Put signature in left column
         sign_row = Table([[sign_img, ""]], colWidths=[0.5*available_width, 0.5*available_width])
         sign_row.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
@@ -487,8 +487,7 @@ if agg_df is not None:
         ]))
         elements.append(sign_row)
 
-        # two small line breaks after sign image
-        elements.append(Spacer(1,8))
+        # one small line break spacer BELOW signature (reduced from two to one)
         elements.append(Spacer(1,8))
 
         # f) & g) Footer bottom line: left signed text and right "for RNA..." text (smaller)
@@ -506,10 +505,11 @@ if agg_df is not None:
         ]))
         elements.append(footer_row)
 
-        # ---------------- Outer frame: use BOX only so inner horizontal dividers are invisible ----------------
+        # Outer frame: only outer BOX (inner rows below amount-in-words are white so appear removed,
+        # but we kept the LINEBELOW on total row to be black)
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
         outer_table.setStyle(TableStyle([
-            ("BOX",(0,0),(-1,-1),0.75,colors.black),    # only outer frame
+            ("BOX",(0,0),(-1,-1),0.75,colors.black),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
