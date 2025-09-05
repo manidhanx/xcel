@@ -7,7 +7,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import tempfile, os
 from datetime import datetime
 
-# --- Number to words ---
 def number_to_words(n):
     ones = ["","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE",
             "TEN","ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN",
@@ -15,11 +14,16 @@ def number_to_words(n):
     tens = ["","","TWENTY","THIRTY","FORTY","FIFTY","SIXTY","SEVENTY","EIGHTY","NINETY"]
 
     def words(num):
-        if num < 20: return ones[num]
-        elif num < 100: return tens[num//10] + ("" if num%10==0 else "-" + ones[num%10])
-        elif num < 1000: return ones[num//100] + " HUNDRED" + ("" if num%100==0 else " " + words(num%100))
-        elif num < 1_000_000: return words(num//1000] + " THOUSAND" + ("" if num%1000==0 else " " + words(num%1000))
-        else: return str(num)
+        if num < 20:
+            return ones[num]
+        elif num < 100:
+            return tens[num//10] + ("" if num%10==0 else "-" + ones[num%10])
+        elif num < 1000:
+            return ones[num//100] + " HUNDRED" + ("" if num%100==0 else " " + words(num%100))
+        elif num < 1_000_000:
+            return words(num//1000) + " THOUSAND" + ("" if num%1000==0 else " " + words(num%1000))
+        else:
+            return str(num)
     return words(n)
 
 def amount_to_words(amount):
