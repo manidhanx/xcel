@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.2 Pure Reference)")
+st.title("📑 Proforma Invoice Generator (v12.2.1 Pure Reference)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -49,7 +49,7 @@ if uploaded_file:
                 try: order_no = row[j+2]
                 except: pass
             elif cell_val == "made in country :":
-                try: 
+                try:
                     made_in = row[j+1]
                     country_of_origin = row[j+1]
                 except: pass
@@ -146,35 +146,33 @@ if agg_df is not None:
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # --- Row 1: Header (half size, centered) ---
+        # --- Row 1: Title (small, centered, no box) ---
         title_table = Table([
             [Paragraph("<font size=7><b>PROFORMA INVOICE</b></font>", bold)]
         ], colWidths=[inner_width])
         title_table.setStyle(TableStyle([
-            ("BOX",(0,0),(-1,-1),0.75,colors.black),
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
             ("TOPPADDING",(0,0),(-1,-1),4),
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
         elements.append(title_table)
-        # Row 2: removed (no empty spacer)
 
-        # --- Row 3: Supplier/Payment/Consignee boxes (no internal row lines) ---
-        # Supplier block as single cell (multi-line paragraph)
+        # --- Supplier/Payment/Consignee blocks ---
+        # align supplier column with end of FABRIC TYPE col in items table
+        left_width = table_width * (0.10 + 0.21 + 0.12)   # STYLE + ITEM + FABRIC proportions
+        right_width = inner_width - left_width
+
         supplier_lines = "Supplier Name:\nSAR APPARELS INDIA PVT.LTD.\nAddress: 6, Picaso Bithi, Kolkata - 700017\nPhone: 9817473373\nFax: N.A."
         supplier_para = Paragraph(supplier_lines.replace("\n","<br/>"), small_bold)
 
-        # Payment / Order ref block (single-cell)
         payment_lines = f"PI No.: {pi_no}\nLandmark order Reference: {order_no}\nBuyer Name: {buyer_name}\nBrand Name: {brand_name}"
         payment_para = Paragraph(payment_lines.replace("\n","<br/>"), normal)
 
-        # Consignee block (single-cell)
         consignee_lines = f"Consignee:\n{consignee_name}\n{consignee_addr}\n{consignee_tel}"
         consignee_para = Paragraph(consignee_lines.replace("\n","<br/>"), normal)
 
-        # Build boxed tables (single-cell boxes) to avoid internal row lines
-        supplier_box = Table([[supplier_para]], colWidths=[0.48*inner_width])
+        supplier_box = Table([[supplier_para]], colWidths=[left_width])
         supplier_box.setStyle(TableStyle([
             ("BOX",(0,0),(-1,-1),0.5,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),4),
@@ -183,7 +181,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        payment_box = Table([[payment_para]], colWidths=[0.48*inner_width])
+        payment_box = Table([[payment_para]], colWidths=[right_width])
         payment_box.setStyle(TableStyle([
             ("BOX",(0,0),(-1,-1),0.5,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),4),
@@ -192,7 +190,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        consignee_box = Table([[consignee_para]], colWidths=[0.48*inner_width])
+        consignee_box = Table([[consignee_para]], colWidths=[right_width])
         consignee_box.setStyle(TableStyle([
             ("BOX",(0,0),(-1,-1),0.5,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),4),
@@ -201,8 +199,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        # Right column: stack payment_box above consignee_box using a nested table
-        right_nested = Table([[payment_box],[consignee_box]], colWidths=[0.48*inner_width])
+        right_nested = Table([[payment_box],[consignee_box]], colWidths=[right_width])
         right_nested.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LEFTPADDING",(0,0),(-1,-1),0),
@@ -211,8 +208,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
 
-        # Main two-column row: supplier_box | right_nested (payment + consignee)
-        info_row = Table([[supplier_box, right_nested]], colWidths=[0.5*inner_width,0.5*inner_width])
+        info_row = Table([[supplier_box, right_nested]], colWidths=[left_width, right_width])
         info_row.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LEFTPADDING",(0,0),(-1,-1),0),
