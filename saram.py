@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.3.1 Pure Reference)")
+st.title("📑 Proforma Invoice Generator (v12.3.2 Pure Reference)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -140,45 +140,34 @@ if agg_df is not None:
         normal=styles["Normal"]
         bold=ParagraphStyle("bold",parent=normal,fontName="Helvetica-Bold",fontSize=10)
         small_bold=ParagraphStyle("small_bold",parent=normal,fontName="Helvetica-Bold",fontSize=8)
+        label_small=ParagraphStyle("label_small",parent=normal,fontName="Helvetica-Bold",fontSize=6)  # two points smaller
+        value_small=ParagraphStyle("value_small",parent=normal,fontName="Helvetica",fontSize=6)    # answers same small size
 
         elements=[]
         content_width = A4[0] - 110          # outer content width (boxed area)
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # --- Row 1: Title centered across outer frame (use content_width) ---
-        title_table = Table([
-            [Paragraph("<font size=7><b>PROFORMA INVOICE</b></font>", bold)]
-        ], colWidths=[content_width])
-        title_table.setStyle(TableStyle([
-            ("ALIGN",(0,0),(-1,-1),"CENTER"),
-            ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ("TOPPADDING",(0,0),(-1,-1),4),
-            ("BOTTOMPADDING",(0,0),(-1,-1),4),
-        ]))
-        elements.append(title_table)
-
-        # --- Supplier/Payment/Consignee blocks ---
-        # New column proportions: STYLE 12.5%, ITEM 18.5%, FABRIC 12% (sum 43% left block)
+        # --- New proportions: STYLE 12.5%, ITEM 18.5%, FABRIC 12% (sum 43% left block) ---
         style_prop = 0.125
         item_prop = 0.185
         fabric_prop = 0.12
 
-        left_width = table_width * (style_prop + item_prop + fabric_prop)   # left block width (same visual edge)
+        left_width = table_width * (style_prop + item_prop + fabric_prop)
         right_width = inner_width - left_width
 
-        # For aligning address/phone/fax values with ITEM DESCRIPTION start:
-        # create supplier inner table with two columns:
-        #   col0 = style_col_width (labels: "Supplier Name:", "Address:", "Phone:", "Fax:")
-        #   col1 = value column which starts where ITEM DESCRIPTION begins (i.e. supplier_inner_col2)
+        # --- Build a combined header table: title row (spans 2 cols) + supplier/payment row
+        title_para = Paragraph("<b>PROFORMA INVOICE</b>", ParagraphStyle("title", parent=normal, alignment=1, fontSize=7))
+        # Supplier inner: labels (small) and values (small), company on next line left aligned with label
         style_col_width = table_width * style_prop
         supplier_inner_col2 = left_width - style_col_width
 
         supplier_lines = [
-            [Paragraph("Supplier Name:", small_bold), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],
-            [Paragraph("Address:", small_bold), Paragraph("6, Picaso Bithi, Kolkata - 700017", normal)],
-            [Paragraph("Phone:", small_bold), Paragraph("9817473373", normal)],
-            [Paragraph("Fax:", small_bold), Paragraph("N.A.", normal)]
+            [Paragraph("Supplier Name:", label_small), Paragraph("", value_small)],              # label only on first line
+            [Paragraph("", label_small), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],# company on next line, left aligned under label
+            [Paragraph("Address:", label_small), Paragraph("6, Picaso Bithi, Kolkata - 700017", value_small)],
+            [Paragraph("Phone:", label_small), Paragraph("9817473373", value_small)],
+            [Paragraph("Fax:", label_small), Paragraph("N.A.", value_small)]
         ]
         supplier_inner = Table(supplier_lines, colWidths=[style_col_width, supplier_inner_col2])
         supplier_inner.setStyle(TableStyle([
@@ -189,14 +178,12 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),1),
         ]))
 
-        # Payment and consignee content as before (no inner boxes)
+        # Payment and consignee content
         payment_lines = f"PI No.: {pi_no}<br/>Landmark order Reference: {order_no}<br/>Buyer Name: {buyer_name}<br/>Brand Name: {brand_name}"
         payment_para = Paragraph(payment_lines, normal)
-
         consignee_lines = f"Consignee:<br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}"
         consignee_para = Paragraph(consignee_lines, normal)
 
-        # Wrap supplier_inner into a single-cell table for consistent placement (no visible box)
         supplier_box = Table([[supplier_inner]], colWidths=[left_width])
         supplier_box.setStyle(TableStyle([
             ("LEFTPADDING",(0,0),(-1,-1),0),
@@ -222,23 +209,28 @@ if agg_df is not None:
         ]))
 
         right_nested = Table([[payment_box],[consignee_box]], colWidths=[right_width])
-        right_nested.setStyle(TableStyle([
-            ("VALIGN",(0,0),(-1,-1),"TOP"),
+        right_nested.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP")]))
+
+        # Combined header table
+        combined = Table([
+            [title_para, ""],
+            [supplier_box, right_nested]
+        ], colWidths=[left_width, right_width])
+        combined.setStyle(TableStyle([
+            ("SPAN",(0,0),(1,0)),                      # span title across both columns
+            ("ALIGN",(0,0),(1,0),"CENTER"),
+            ("VALIGN",(0,0),(1,0),"MIDDLE"),
+            # vertical divider line at the end of left column: from top row to bottom row (row 0 to row 1)
+            ("LINEAFTER",(0,0),(0,1),0.75,colors.black),
+            # remove inner cell lines
+            ("BOX",(0,0),(-1,-1),0,colors.white),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
 
-        info_row = Table([[supplier_box, right_nested]], colWidths=[left_width, right_width])
-        info_row.setStyle(TableStyle([
-            ("VALIGN",(0,0),(-1,-1),"TOP"),
-            ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),0),
-            ("TOPPADDING",(0,0),(-1,-1),0),
-            ("BOTTOMPADDING",(0,0),(-1,-1),0),
-        ]))
-        elements.append(info_row)
+        elements.append(combined)
         elements.append(Spacer(1,8))
 
         # --- Shipment Info (pure) ---
@@ -257,7 +249,7 @@ if agg_df is not None:
         elements.append(ship_table)
         elements.append(Spacer(1,8))
 
-        # --- Main Items Table (pure black/white) ---
+        # --- Main Items Table ---
         data=[list(agg_df.columns)]
         for _,row in agg_df.iterrows(): data.append(list(row))
         total_qty=agg_df["QTY"].sum()
@@ -265,8 +257,8 @@ if agg_df is not None:
         data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
 
         col_widths = [
-            table_width * style_prop,    # STYLE NO. wider (12.5%)
-            table_width * item_prop,     # ITEM DESCRIPTION slightly narrower (18.5%)
+            table_width * style_prop,    # STYLE NO. (12.5%)
+            table_width * item_prop,     # ITEM DESCRIPTION (18.5%)
             table_width * fabric_prop,   # FABRIC TYPE (12%)
             table_width * 0.10,          # H.S NO
             table_width * 0.15,          # COMPOSITION
@@ -316,7 +308,7 @@ if agg_df is not None:
         elements.append(terms_table)
         elements.append(Spacer(1,12))
 
-        # --- Signature (restored image on left) ---
+        # --- Signature ---
         sig_img = "sarsign.png"
         sign_table=Table([
             [Image(sig_img,width=150,height=50), Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]
@@ -334,8 +326,8 @@ if agg_df is not None:
         # --- Outer Frame (thinner) ---
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
         outer_table.setStyle(TableStyle([
-            ("GRID",(0,0),(-1,-1),0.75,colors.black),   # halved thickness
-            ("VALIGN",(0,0),(-1,-1),"TOP")
+            ("GRID",(0,0),(-1,-1),0.75,colors.black),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
         ]))
 
         doc.build([outer_table])
