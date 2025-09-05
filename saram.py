@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.2.1 Pure Reference)")
+st.title("📑 Proforma Invoice Generator (v12.3 Pure Reference)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -142,14 +142,14 @@ if agg_df is not None:
         small_bold=ParagraphStyle("small_bold",parent=normal,fontName="Helvetica-Bold",fontSize=8)
 
         elements=[]
-        content_width = A4[0] - 110
+        content_width = A4[0] - 110          # outer content width (boxed area)
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # --- Row 1: Title (small, centered, no box) ---
+        # --- Row 1: Title centered across outer frame (use content_width) ---
         title_table = Table([
             [Paragraph("<font size=7><b>PROFORMA INVOICE</b></font>", bold)]
-        ], colWidths=[inner_width])
+        ], colWidths=[content_width])
         title_table.setStyle(TableStyle([
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
@@ -159,31 +159,51 @@ if agg_df is not None:
         elements.append(title_table)
 
         # --- Supplier/Payment/Consignee blocks ---
-        # align supplier column with end of FABRIC TYPE col in items table
-        left_width = table_width * (0.10 + 0.21 + 0.12)   # STYLE + ITEM + FABRIC proportions
+        # New column proportions: STYLE 12.5%, ITEM 18.5%, FABRIC 12% (sum 43% left block)
+        style_prop = 0.125
+        item_prop = 0.185
+        fabric_prop = 0.12
+
+        left_width = table_width * (style_prop + item_prop + fabric_prop)   # left block width (same visual edge)
         right_width = inner_width - left_width
 
-        supplier_lines = "Supplier Name:\nSAR APPARELS INDIA PVT.LTD.\nAddress: 6, Picaso Bithi, Kolkata - 700017\nPhone: 9817473373\nFax: N.A."
-        supplier_para = Paragraph(supplier_lines.replace("\n","<br/>"), small_bold)
+        # For aligning address/phone/fax with ITEM DESCRIPTION start: create nested cols inside supplier block
+        style_col_width = table_width * style_prop
+        supplier_inner_col2 = left_width - style_col_width
 
-        payment_lines = f"PI No.: {pi_no}\nLandmark order Reference: {order_no}\nBuyer Name: {buyer_name}\nBrand Name: {brand_name}"
-        payment_para = Paragraph(payment_lines.replace("\n","<br/>"), normal)
+        supplier_lines = [
+            [Paragraph("Supplier Name:", small_bold), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],
+            ["", Paragraph("Address: 6, Picaso Bithi, Kolkata - 700017", normal)],
+            ["", Paragraph("Phone: 9817473373", normal)],
+            ["", Paragraph("Fax: N.A.", normal)]
+        ]
+        supplier_inner = Table(supplier_lines, colWidths=[style_col_width, supplier_inner_col2])
+        supplier_inner.setStyle(TableStyle([
+            ("VALIGN",(0,0),(-1,-1),"TOP"),
+            ("LEFTPADDING",(0,0),(-1,-1),2),
+            ("RIGHTPADDING",(0,0),(-1,-1),2),
+            ("TOPPADDING",(0,0),(-1,-1),1),
+            ("BOTTOMPADDING",(0,0),(-1,-1),1),
+        ]))
 
-        consignee_lines = f"Consignee:\n{consignee_name}\n{consignee_addr}\n{consignee_tel}"
-        consignee_para = Paragraph(consignee_lines.replace("\n","<br/>"), normal)
+        # Payment and consignee content as before (no inner boxes)
+        payment_lines = f"PI No.: {pi_no}<br/>Landmark order Reference: {order_no}<br/>Buyer Name: {buyer_name}<br/>Brand Name: {brand_name}"
+        payment_para = Paragraph(payment_lines, normal)
 
-        supplier_box = Table([[supplier_para]], colWidths=[left_width])
+        consignee_lines = f"Consignee:<br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}"
+        consignee_para = Paragraph(consignee_lines, normal)
+
+        # Wrap supplier_inner into a single-cell table for consistent placement (no box)
+        supplier_box = Table([[supplier_inner]], colWidths=[left_width])
         supplier_box.setStyle(TableStyle([
-            ("BOX",(0,0),(-1,-1),0.5,colors.black),
-            ("LEFTPADDING",(0,0),(-1,-1),4),
-            ("RIGHTPADDING",(0,0),(-1,-1),4),
-            ("TOPPADDING",(0,0),(-1,-1),4),
-            ("BOTTOMPADDING",(0,0),(-1,-1),4),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
 
         payment_box = Table([[payment_para]], colWidths=[right_width])
         payment_box.setStyle(TableStyle([
-            ("BOX",(0,0),(-1,-1),0.5,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),4),
             ("RIGHTPADDING",(0,0),(-1,-1),4),
             ("TOPPADDING",(0,0),(-1,-1),4),
@@ -192,7 +212,6 @@ if agg_df is not None:
 
         consignee_box = Table([[consignee_para]], colWidths=[right_width])
         consignee_box.setStyle(TableStyle([
-            ("BOX",(0,0),(-1,-1),0.5,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),4),
             ("RIGHTPADDING",(0,0),(-1,-1),4),
             ("TOPPADDING",(0,0),(-1,-1),4),
@@ -243,15 +262,15 @@ if agg_df is not None:
         data.append(["TOTAL","","","","","",f"{int(total_qty):,}","USD",f"{total_amount:,.2f}"])
 
         col_widths = [
-            table_width * 0.10,
-            table_width * 0.21,
-            table_width * 0.12,
-            table_width * 0.10,
-            table_width * 0.15,
-            table_width * 0.08,
-            table_width * 0.07,
-            table_width * 0.08,
-            table_width * 0.09
+            table_width * style_prop,    # STYLE NO. wider (12.5%)
+            table_width * item_prop,     # ITEM DESCRIPTION slightly narrower (18.5%)
+            table_width * fabric_prop,   # FABRIC TYPE (12%)
+            table_width * 0.10,          # H.S NO
+            table_width * 0.15,          # COMPOSITION
+            table_width * 0.08,          # ORIGIN
+            table_width * 0.07,          # QTY
+            table_width * 0.08,          # FOB
+            table_width * 0.09           # AMOUNT
         ]
 
         table=Table(data,colWidths=col_widths,repeatRows=1)
@@ -309,10 +328,10 @@ if agg_df is not None:
                                         ]))
         elements.append(sign_table)
 
-        # --- Outer Frame ---
+        # --- Outer Frame (thinner) ---
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
         outer_table.setStyle(TableStyle([
-            ("GRID",(0,0),(-1,-1),1.5,colors.black),
+            ("GRID",(0,0),(-1,-1),0.75,colors.black),   # halved thickness
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
 
