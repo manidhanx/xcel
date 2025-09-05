@@ -1,4 +1,4 @@
-# proforma_v12.9.3_currency_shift_12spacers_12breaks.py
+# proforma_v12.9.3_currency_shift_14spacers_15breaks.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -255,7 +255,6 @@ if agg_df is not None:
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # Right row3 : 3 breaks (kept)
         right_row3_para = Paragraph(
             f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/>"
             f"<b>Remarks:</b> (if any)",
@@ -268,13 +267,13 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # === NEW: Row4 right - add TWELVE line breaks and shift right by 12 spacer columns ===
-        currency_para = Paragraph("<br/>" * 12 + "CURRENCY: USD", row1_normal)
+        # === FINAL: Row4 right - add FIFTEEN line breaks and shift right by 14 spacer columns ===
+        br_count = 15
+        currency_para = Paragraph("<br/>" * br_count + "CURRENCY: USD", row1_normal)
 
-        # Create 12 spacer columns + 1 column for the currency itself (12 spacers = 7 more than your previous 5)
-        spacer_count = 12
-        spacer_fraction = 0.06  # fraction of right_width to use per spacer column (reduced fraction to avoid overflow)
-        spacer_w = max(6, right_width * spacer_fraction)
+        spacer_count = 14
+        spacer_fraction = 0.055  # fraction of right_width to use per spacer column
+        spacer_w = max(5, right_width * spacer_fraction)
         last_col_w = max(40, right_width - (spacer_w * spacer_count))
 
         currency_inner_cols = [spacer_w] * spacer_count + [last_col_w]
