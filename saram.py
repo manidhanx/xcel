@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -146,23 +146,23 @@ if agg_df is not None:
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # --- Header (no logo, simple black grid) ---
+        # --- Row 1: Header (small & centered) ---
         title_table = Table([
-            [Paragraph("<font size=20><b>PROFORMA INVOICE</b></font>", bold)]
+            [Paragraph("<font size=14><b>PROFORMA INVOICE</b></font>", bold)]
         ], colWidths=[inner_width])
         title_table.setStyle(TableStyle([
             ("GRID",(0,0),(-1,-1),0.75,colors.black),
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ("TOPPADDING",(0,0),(-1,-1),8),
-            ("BOTTOMPADDING",(0,0),(-1,-1),8),
+            ("TOPPADDING",(0,0),(-1,-1),6),
+            ("BOTTOMPADDING",(0,0),(-1,-1),6),
         ]))
         elements.append(title_table)
-        elements.append(Spacer(1,12))
+        # --- Row 2: removed (no Spacer here) ---
 
-        # --- Supplier & Consignee (pure) ---
+        # --- Row 3: Supplier line with company moved to next line ---
         sup=[
-            [Paragraph("Supplier Name: SAR APPARELS INDIA PVT.LTD.", small_bold), Paragraph(pi_no, normal)],
+            [Paragraph("Supplier Name:<br/>SAR APPARELS INDIA PVT.LTD.", small_bold), Paragraph(pi_no, normal)],
             [Paragraph("Address: 6, Picaso Bithi, Kolkata - 700017", normal), Paragraph("<b>Landmark order Reference:</b> "+str(order_no), normal)],
             [Paragraph("Phone: 9817473373", normal), Paragraph("<b>Buyer Name:</b> "+buyer_name, normal)],
             [Paragraph("Fax: N.A.", normal), Paragraph("<b>Brand Name:</b> "+brand_name, normal)],
@@ -180,9 +180,14 @@ if agg_df is not None:
         info_table=Table(sup+con,colWidths=[0.5*inner_width,0.5*inner_width])
         info_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                         ("VALIGN",(0,0),(-1,-1),"TOP"),
-                                        ("FONTSIZE",(0,0),(-1,-1),8)]))
+                                        ("FONTSIZE",(0,0),(-1,-1),8),
+                                        ("LEFTPADDING",(0,0),(-1,-1),4),
+                                        ("RIGHTPADDING",(0,0),(-1,-1),4),
+                                        ("TOPPADDING",(0,0),(-1,-1),2),
+                                        ("BOTTOMPADDING",(0,0),(-1,-1),2),
+                                        ]))
         elements.append(info_table)
-        elements.append(Spacer(1,12))
+        elements.append(Spacer(1,8))
 
         # --- Shipment Info (pure) ---
         ship=[
@@ -191,9 +196,14 @@ if agg_df is not None:
         ]
         ship_table=Table(ship,colWidths=[0.5*inner_width,0.5*inner_width])
         ship_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                        ("FONTSIZE",(0,0),(-1,-1),8)]))
+                                        ("FONTSIZE",(0,0),(-1,-1),8),
+                                        ("LEFTPADDING",(0,0),(-1,-1),4),
+                                        ("RIGHTPADDING",(0,0),(-1,-1),4),
+                                        ("TOPPADDING",(0,0),(-1,-1),2),
+                                        ("BOTTOMPADDING",(0,0),(-1,-1),2),
+                                        ]))
         elements.append(ship_table)
-        elements.append(Spacer(1,12))
+        elements.append(Spacer(1,8))
 
         # --- Main Items Table (pure black/white) ---
         data=[list(agg_df.columns)]
@@ -238,25 +248,35 @@ if agg_df is not None:
         amount_words=amount_to_words(total_amount)
         words_table=Table([[Paragraph(f"TOTAL  US DOLLAR {amount_words}", normal)]],colWidths=[inner_width])
         words_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
+                                         ("FONTSIZE",(0,0),(-1,-1),8),
+                                         ("LEFTPADDING",(0,0),(-1,-1),4),
+                                         ("RIGHTPADDING",(0,0),(-1,-1),4),
+                                         ]))
         elements.append(words_table)
 
         # --- Terms & Conditions ---
         terms_table=Table([[Paragraph("Terms & Conditions (if any):", normal)]],colWidths=[inner_width])
         terms_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
-                                         ("FONTSIZE",(0,0),(-1,-1),8)]))
+                                         ("FONTSIZE",(0,0),(-1,-1),8),
+                                         ("LEFTPADDING",(0,0),(-1,-1),4),
+                                         ("RIGHTPADDING",(0,0),(-1,-1),4),
+                                         ]))
         elements.append(terms_table)
-        elements.append(Spacer(1,24))
+        elements.append(Spacer(1,12))
 
-        # --- Signature ---
+        # --- Signature (restored image on left) ---
         sig_img = "sarsign.png"
         sign_table=Table([
-            ["", Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]
+            [Image(sig_img,width=150,height=50), Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]
         ],colWidths=[0.5*inner_width,0.5*inner_width])
         sign_table.setStyle(TableStyle([("GRID",(0,0),(-1,-1),0.25,colors.black),
                                         ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+                                        ("ALIGN",(0,0),(0,0),"LEFT"),
                                         ("ALIGN",(1,0),(1,0),"RIGHT"),
-                                        ("FONTSIZE",(0,0),(-1,-1),8)]))
+                                        ("FONTSIZE",(0,0),(-1,-1),8),
+                                        ("LEFTPADDING",(0,0),(-1,-1),4),
+                                        ("RIGHTPADDING",(0,0),(-1,-1),4),
+                                        ]))
         elements.append(sign_table)
 
         # --- Outer Frame ---
