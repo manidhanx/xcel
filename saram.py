@@ -1,4 +1,4 @@
-# proforma_v12.9.3_final_tweaks_v4.py
+# proforma_v12.9.3_final_tweaks_v5.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -129,7 +129,8 @@ if agg_df is not None:
             pdf_file=tmp.name
 
         doc=SimpleDocTemplate(pdf_file,pagesize=A4,leftMargin=30,rightMargin=30,topMargin=30,bottomMargin=30)
-        styles=getSampleStyleSheet(); normal=styles["Normal"]
+        styles=getSampleStyleSheet()
+        normal=styles["Normal"]
 
         # Styles
         title_style = ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)
@@ -146,17 +147,23 @@ if agg_df is not None:
         amount_words_style = ParagraphStyle("amount_words_style", parent=normal, fontName="Helvetica-Bold", fontSize=7.5, leading=8.5)
         terms_small = ParagraphStyle("terms_small", parent=normal, fontName="Helvetica", fontSize=6, leading=7)
 
-        elements=[]; content_width = A4[0] - 110; available_width = content_width - 0.5
+        elements=[]
+        content_width = A4[0] - 110
+        available_width = content_width - 0.5
 
         # Columns
         props = [0.125, 0.185, 0.12, 0.10, 0.15, 0.08, 0.07, 0.08, 0.09]
-        total_prop = sum(props); props = [p/total_prop for p in props]
+        total_prop = sum(props)
+        props = [p/total_prop for p in props]
         col_widths = [available_width * p for p in props]
         diff = available_width - sum(col_widths)
-        if abs(diff) > 0: col_widths[-1] += diff
-        left_width = sum(col_widths[:3]); right_width = available_width - left_width
+        if abs(diff) > 0:
+            col_widths[-1] += diff
 
-        # Align “origin” for bank answers
+        left_width = sum(col_widths[:3])
+        right_width = available_width - left_width
+
+        # Align “origin” for bank answers (kept same)
         origin_left_absolute = sum(col_widths[:5])
         indent_inside_right = origin_left_absolute - left_width
         items_cell_left_padding = 4
@@ -164,7 +171,7 @@ if agg_df is not None:
         extra_left_shift = col_widths[6] * 3
         spacer_to_origin = max(0, indent_inside_right_corrected - extra_left_shift)
 
-        # Title with black underline
+        # --- Title with black underline ---
         title_tbl = Table([[Paragraph("PROFORMA INVOICE", title_style)]], colWidths=[available_width])
         title_tbl.setStyle(TableStyle([
             ("ALIGN",(0,0),(-1,-1),"CENTER"),
@@ -200,14 +207,14 @@ if agg_df is not None:
             ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),6)
         ]))
 
-        # Row 1 Right: PI (TOP ALIGNED per request)
+        # Row 1 Right: PI (TOP ALIGNED)
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
         right_top.setStyle(TableStyle([
             ("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
-            ("LINEBELOW",(0,0),(0,0),0.6,colors.black)
+            ("LINEBELOW",(0,0),(0,0),0.6,colors.black),
         ]))
         right_bottom_para = Paragraph(
             f"<b>Landmark order Reference:</b> {order_no}<br/>"
@@ -221,7 +228,7 @@ if agg_df is not None:
         ]))
         right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width])
         right_stack.setStyle(TableStyle([
-            ("VALIGN",(0,0),(0,1),"TOP"),  # enforce top on stack
+            ("VALIGN",(0,0),(0,1),"TOP"),
             ("LEFTPADDING",(0,0),(0,1),2),("RIGHTPADDING",(0,0),(0,1),0)
         ]))
 
@@ -286,7 +293,7 @@ if agg_df is not None:
             ("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
-        # (b) Add one more line break -> now THREE <br/> between the two lines
+        # Add three breaks (one extra from previous)
         right_row3_para = Paragraph(
             f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/>"
             f"<b>Remarks:</b> (if any)", row1_normal)
@@ -303,18 +310,32 @@ if agg_df is not None:
             ("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
-        # (c) Right align + bottom align ensured
+
+        # --- (a) Compute left padding so "CURRENCY: USD" starts at QTY column start ---
+        # QTY column index is 6 (0-based). Compute absolute left position of QTY column and convert to padding within right block.
+        qty_col_index = 6
+        # left edge of style table relative to document is left frame + 0 — but we only need relative offset inside the right block:
+        # position of QTY column left edge relative to the start of the right block = sum(col_widths[:qty_col_index]) - left_width
+        qty_left_rel_to_rightblock = sum(col_widths[:qty_col_index]) - left_width
+        # ensure non-negative
+        qty_left_rel_to_rightblock = max(0, qty_left_rel_to_rightblock)
+        # we also want a tiny breathing space (2 points)
+        padding_needed = qty_left_rel_to_rightblock + 2
+
         currency_para = Paragraph("CURRENCY: USD", row1_normal)
         row4_height = 56
         right_row4_box = Table([[currency_para]], colWidths=[right_width], rowHeights=[row4_height])
+        # apply computed left padding so the text visually lines up with QTY column start
         right_row4_box.setStyle(TableStyle([
             ("ALIGN",(0,0),(0,0),"RIGHT"),
             ("VALIGN",(0,0),(0,0),"BOTTOM"),
-            ("LEFTPADDING",(0,0),(0,0),2),("RIGHTPADDING",(0,0),(0,0),0),
-            ("TOPPADDING",(0,0),(0,0),0),("BOTTOMPADDING",(0,0),(0,0),2),
+            ("LEFTPADDING",(0,0),(0,0),padding_needed),
+            ("RIGHTPADDING",(0,0),(0,0),2),
+            ("TOPPADDING",(0,0),(0,0),0),
+            ("BOTTOMPADDING",(0,0),(0,0),2),
         ]))
 
-        # Header table — (d) no spacer after this; bottom line touches items table
+        # Header table -- no spacer after; bottom line touches items table
         header_table = Table([
             [supplier_stack, right_stack],
             [consignee_box, payment_block],
@@ -328,8 +349,10 @@ if agg_df is not None:
             ("LINEBELOW",(0,1),(1,1),0.35,colors.black),
             ("LINEBELOW",(0,2),(1,2),0.35,colors.black),
             ("LINEBELOW",(0,3),(1,3),0.9,colors.black),
-            ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
-            ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),0),
             ("BOTTOMPADDING",(0,3),(1,3),0),
         ]))
         elements.append(header_table)
@@ -351,11 +374,11 @@ if agg_df is not None:
         total_qty = agg_df["QTY"].sum()
         total_amount = agg_df["AMOUNT"].astype(float).sum()
 
+        # keep 10 extra blank rows
         EXTRA_BLANK_ROWS = 10
         actual_body = len(body_rows)
-        if actual_body < actual_body + EXTRA_BLANK_ROWS:
-            for _ in range(EXTRA_BLANK_ROWS):
-                body_rows.append([""]*len(header_row))
+        for _ in range(EXTRA_BLANK_ROWS):
+            body_rows.append([""]*len(header_row))
 
         data = [header_row] + body_rows
         total_row = ["TOTAL","","","","",f"{int(total_qty):,}","",None,None]
@@ -402,7 +425,6 @@ if agg_df is not None:
         items_style.add("FONTNAME",(7,total_idx),(8,total_idx),"Helvetica-Bold")
         items_style.add("FONTSIZE",(7,total_idx),(8,total_idx),7)
 
-        # Black line above and below the TOTAL row
         items_style.add("LINEABOVE",(0,total_idx),(-1,total_idx),0.5,colors.black)
         items_style.add("LINEBELOW",(0,total_idx),(-1,total_idx),0.5,colors.black)
         items_style.add("LINEAFTER",(4,total_idx),(4,total_idx),0.6,colors.black)
@@ -438,7 +460,7 @@ if agg_df is not None:
         ]))
         elements.append(terms_table)
 
-        # Signature (no extra spacer above; just one small below later)
+        # Signature (single small spacer below)
         sig_img = "sarsign.png"
         try:
             sign_img = Image(sig_img, width=220, height=80)
@@ -452,10 +474,12 @@ if agg_df is not None:
             ("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),
         ]))
         elements.append(sign_row)
-        elements.append(Spacer(1,8))  # single small spacer below
+        elements.append(Spacer(1,8))
 
+        # Footer: left normal, right BOLD (user requested bold)
         left_footer = Paragraph("Signed by ……………………. (Affix Stamp here)", ParagraphStyle("fl", parent=normal, fontSize=6))
-        right_footer = Paragraph("for RNA Resources Group Ltd-Landmark (Babyshop)", ParagraphStyle("fr", parent=normal, fontSize=6, alignment=2))
+        right_footer = Paragraph("for RNA Resources Group Ltd-Landmark (Babyshop)",
+                                 ParagraphStyle("fr", parent=normal, fontSize=6, alignment=2, fontName="Helvetica-Bold"))
         footer_row = Table([[left_footer, right_footer]], colWidths=[0.5*available_width, 0.5*available_width])
         footer_row.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
@@ -469,7 +493,8 @@ if agg_df is not None:
         outer_table.setStyle(TableStyle([
             ("BOX",(0,0),(-1,-1),0.75,colors.black),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
-            ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
         ]))
 
         doc.build([outer_table])
