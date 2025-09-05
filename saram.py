@@ -1,4 +1,3 @@
-# proforma_v12.8.0.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -32,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.8.0)")
+st.title("📑 Proforma Invoice Generator (v12.8.1)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -144,16 +143,15 @@ if agg_df is not None:
         title_style = ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)
         supplier_label = ParagraphStyle("supplier_label", parent=normal, fontName="Helvetica-Bold", fontSize=8)
         supplier_company = ParagraphStyle("supplier_company", parent=normal, fontName="Helvetica-Bold", fontSize=7)
-        # Row1 font size baseline used for Row2 left
-        row1_font_size = 8
-        row1_style = ParagraphStyle("row1", parent=normal, fontName="Helvetica-Bold", fontSize=row1_font_size)
-        row1_normal = ParagraphStyle("row1_normal", parent=normal, fontName="Helvetica", fontSize=row1_font_size)
-
         supplier_small_label = ParagraphStyle("supplier_small_label", parent=normal, fontName="Helvetica", fontSize=6)
         supplier_small_value = ParagraphStyle("supplier_small_value", parent=normal, fontName="Helvetica", fontSize=6)
 
         right_block_style = ParagraphStyle("right_block", parent=normal, fontName="Helvetica", fontSize=8, leading=10)
         right_top_style = ParagraphStyle("right_top", parent=normal, fontName="Helvetica-Bold", fontSize=8, leading=9)
+
+        # Row 2 left should match Row 1 content size
+        row1_font_size = 8
+        row1_normal = ParagraphStyle("row1_normal", parent=normal, fontName="Helvetica", fontSize=row1_font_size)
 
         payment_header_style=ParagraphStyle("payment_header", parent=normal, fontName="Helvetica-Bold", fontSize=7)
         label_small=ParagraphStyle("label_small", parent=normal, fontName="Helvetica-Bold", fontSize=7)
@@ -164,7 +162,7 @@ if agg_df is not None:
         inner_width = content_width - 6
         table_width = inner_width - 6
 
-        # proportions (same as before)
+        # proportions (keep consistent with items table)
         style_prop = 0.125
         item_prop = 0.185
         fabric_prop = 0.12
@@ -172,7 +170,7 @@ if agg_df is not None:
         left_width = table_width * (style_prop + item_prop + fabric_prop)
         right_width = inner_width - left_width
 
-        # compute indent so payment answers begin at ORIGIN column left edge
+        # compute absolute X where ORIGIN column starts (to align ':-')
         before_origin_prop = style_prop + item_prop + fabric_prop + 0.10 + 0.15
         origin_left_absolute = table_width * before_origin_prop
         indent_inside_right = origin_left_absolute - left_width
@@ -188,7 +186,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        # ---------------- ROW 1 LEFT - company single-line
+        # ---------------- ROW 1 LEFT ----------------
         supplier_title = Table([
             [Paragraph("Supplier Name:", supplier_label)],
             [Paragraph("SAR APPARELS INDIA PVT.LTD.", supplier_company)]
@@ -201,7 +199,6 @@ if agg_df is not None:
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
 
-        # contacts below (unchanged layout) but smaller font for contact labels/values
         supplier_contact = Table([
             [Paragraph("Address:", supplier_small_label), Paragraph("6, Picaso Bithi, Kolkata - 700017", supplier_small_value)],
             [Paragraph("Phone:", supplier_small_label), Paragraph("9817473373", supplier_small_value)],
@@ -224,7 +221,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
 
-        # ---------------- ROW 1 RIGHT - same as before (PI top divider etc.)
+        # ---------------- ROW 1 RIGHT ----------------
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
         right_top.setStyle(TableStyle([
@@ -260,8 +257,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
 
-        # ---------------- ROW 2 LEFT: Consignee (keep contents/format; match Row1 font size)
-        # Use row1_normal (same font size as row1 content)
+        # ---------------- ROW 2 LEFT: Consignee (match Row1 font size) ----------------
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", row1_normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([
@@ -272,72 +268,71 @@ if agg_df is not None:
             ("VALIGN",(0,0),(-1,-1),"TOP"),
         ]))
 
-        # ---------------- ROW 2 RIGHT: Payment / Bank details EXACT spec
-        # Payment Term single-line (small bold label + normal value)
-        pay_label = Paragraph("Payment Term:", label_small)
+        # ---------------- ROW 2 RIGHT: Payment & Bank details with breather, 2-line address, and aligned ':-' ----------------
+        # Payment Term single line
+        label_small_b = ParagraphStyle("label_small_b", parent=label_small, fontName="Helvetica-Bold")
+        pay_label = Paragraph("Payment Term:", label_small_b)
         pay_value = Paragraph(payment_term_val, value_small)
-        # We'll make a single-line table for that
         pay_term_tbl = Table([[pay_label, pay_value]], colWidths=[right_width*0.28, right_width*0.72])
         pay_term_tbl.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
-            ("TOPPADDING",(0,0),(-1,-1),0),
-            ("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
 
-        # one blank spacer row (we'll incorporate as an explicit spacer Table row)
+        # one blank line
         blank_row = Table([[""]], colWidths=[right_width])
-        blank_row.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4)]))
+        blank_row.setStyle(TableStyle([("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2)]))
 
-        # Bank Details heading (bold left aligned across block)
+        # Bank heading (bold)
         bank_heading = Paragraph("Bank Details (Including Swift/IBAN)", payment_header_style)
         bank_heading_tbl = Table([[bank_heading]], colWidths=[right_width])
-        bank_heading_tbl.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),0),("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),4)]))
+        bank_heading_tbl.setStyle(TableStyle([
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("TOPPADDING",(0,0),(-1,-1),0),
+            ("BOTTOMPADDING",(0,0),(-1,-1),2),
+        ]))
 
-        # Now the label/value pairs — ensure label column is wide enough so labels + ' :-' never wrap
-        # We'll compute label_col_w from table_width so it aligns with ORIGIN position as requested.
-        # label_col_w should be enough to hold the longest label; set safe minimum.
-        # We want the *values column left edge* to align with ORIGIN cell start -> that's indent_inside_right offset.
-        # So set spacing: [label_col_w, spacer_w, value_col_w] where spacer_w = indent_inside_right and value_col_w fills remainder.
-        label_col_w = max(85, table_width * 0.08)  # safe minimum for label width to avoid wraps
-        spacer_w = indent_inside_right
-        value_col_w = right_width - label_col_w - spacer_w - 6
-        if value_col_w < 80:
-            # fallback: reduce spacer and increase value column to allow wrapping nicely
-            value_col_w = max(80, right_width - label_col_w - 6)
-            spacer_w = right_width - label_col_w - value_col_w - 6
-            if spacer_w < 0:
-                spacer_w = 0
+        # Build the 3-column grid: [label | spacer_to_origin_minus_colon | ':-' | value]
+        # We want the ':' column's LEFT EDGE to be exactly at indent_inside_right from the right-block left.
+        colon_w = 10  # width for the ":-" column
+        spacer_to_origin = max(0, indent_inside_right - colon_w)
+        label_col_w = max(85, table_width * 0.08)  # wide enough so labels never wrap
+        remaining = right_width - label_col_w - spacer_to_origin - colon_w - 6
+        value_col_w = max(80, remaining)
 
         bank_rows = []
-        bank_pairs = [
-            ("Beneficiary :-", "SAR APPARELS INDIA PVT.LTD"),
-            ("Account No :-", "2112819952"),
-            ("BANK'S NAME :-", "KOTAK MAHINDRA BANK LTD"),
-            ("BANK ADDRESS :-", "2 BRABOURNE ROAD, GOVIND BHAVAN, GROUND FLOOR,"),
-            ("", "KOLKATA-700001"),  # continuation of address (keeps value column wrapped into second line)
-            ("SWIFT CODE :-", "KKBKINNBCPC"),
-            ("BANK CODE :-", "0323")
-        ]
-        for lbl, val in bank_pairs:
-            # labels are bold and include the ':-' where applicable; empty label allowed for address continuation
-            bank_rows.append([Paragraph(lbl, label_small), "", Paragraph(val, value_small)])
+        def row(lbl, val, is_continuation=False):
+            # For continuation (second line of address), leave label and ':-' empty
+            bank_rows.append([
+                Paragraph(lbl, label_small) if not is_continuation else Paragraph("", label_small),
+                "", Paragraph(":-", label_small) if (lbl and not is_continuation) else Paragraph("", label_small),
+                Paragraph(val, value_small)
+            ])
 
-        bank_inner = Table(bank_rows, colWidths=[label_col_w, spacer_w, value_col_w])
+        row("Beneficiary", "SAR APPARELS INDIA PVT.LTD")
+        row("Account No", "2112819952")
+        row("BANK'S NAME", "KOTAK MAHINDRA BANK LTD")
+        # Force address into exactly two lines:
+        row("BANK ADDRESS", "2 BRABOURNE ROAD, GOVIND BHAVAN, GROUND FLOOR,")
+        row("", "KOLKATA-700001", is_continuation=True)
+        row("SWIFT CODE", "KKBKINNBCPC")
+        row("BANK CODE", "0323")
+
+        bank_inner = Table(bank_rows, colWidths=[label_col_w, spacer_to_origin, colon_w, value_col_w])
         bank_inner.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
-            ("LEFTPADDING",(0,0),(-1,-1),2),
-            ("RIGHTPADDING",(0,0),(-1,-1),2),
+            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),1),
             ("BOTTOMPADDING",(0,0),(-1,-1),1),
         ]))
 
-        # Compose right payment block vertically: pay_term_tbl, blank_row, bank_heading, bank_inner
+        # Stack the payment block with a left breather padding to mirror Row 1
         payment_block = Table([[pay_term_tbl],[blank_row],[bank_heading_tbl],[bank_inner]], colWidths=[right_width])
         payment_block.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
-            ("LEFTPADDING",(0,0),(-1,-1),0),
+            ("LEFTPADDING",(0,0),(-1,-1),4),   # breather from center divider
             ("RIGHTPADDING",(0,0),(-1,-1),2),
             ("TOPPADDING",(0,0),(-1,-1),0),
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
