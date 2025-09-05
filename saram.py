@@ -1,4 +1,4 @@
-# proforma_v12.9.3_fix_row3_right_with_table_padding.py
+# proforma_v12.9.3_fix_row3_right_table10rows_reduced_heights.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.9.3 - table padded)")
+st.title("📑 Proforma Invoice Generator (v12.9.3 - table padded 10 rows, heights -25%)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -110,8 +110,6 @@ if uploaded_file:
                     amount=total_qty*unit_price
                     aggregated_data.append([style,desc,texture or "Knitted","61112000",comp,
                         country_of_origin or "India",int(total_qty),f"{unit_price:.2f}",f"{amount:.2f}"])
-
-
             agg_df=pd.DataFrame(aggregated_data,columns=[
                 "STYLE NO.","ITEM DESCRIPTION","FABRIC TYPE","H.S NO","COMPOSITION","ORIGIN","QTY","FOB","AMOUNT"
             ])
@@ -256,17 +254,11 @@ if agg_df is not None:
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # ---------- FIX: ROW 3 RIGHT BLOCK (removed duplicate 'Loading Country' and reordered) ----------
-        # Now shows:
-        #   L/C Advising Bank: (If applicable)   <-- first
-        #   Remarks: (if any)                     <-- last
         right_row3_para = Paragraph(
             f"<b>L/C Advising Bank:</b> (If applicable)<br/>"
             f"<b>Remarks:</b> (if any)",
             row1_normal
         )
-        # ---------------------------------------------------------------------------------------------
-
         right_row3_box = Table([[right_row3_para]], colWidths=[right_width])
         right_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
@@ -303,19 +295,19 @@ if agg_df is not None:
         # no spacer — header bottom line is the top border of the items table
 
         # ---------------------- ITEMS / STYLE TABLE (modified per your request) ----------------------
-        # - increase header height to feel like 3 header rows
-        # - add 12 extra blank rows to the body (actual_rows + 12)
+        # - increase header height (3-row feel)
+        # - add 10 extra blank rows to the body (actual_rows + 10)
         # - reduce font sizes for header & body, and make row heights compact/tight
         header_row = list(agg_df.columns)
         body_rows = [list(row) for _, row in agg_df.iterrows()]
         total_row = ["TOTAL","","","","","",f"{int(agg_df['QTY'].sum()):,}","USD",f"{agg_df['AMOUNT'].astype(float).sum():,.2f}"]
 
-        # add 12 extra blank rows irrespective of actual body count
-        EXTRA_BLANK_ROWS = 12
+        # add 10 extra blank rows irrespective of actual body count
+        EXTRA_BLANK_ROWS = 10
         actual_body_count = len(body_rows)
         body_count = actual_body_count + EXTRA_BLANK_ROWS
 
-        # pad body with empty rows to reach actual + 12
+        # pad body with empty rows to reach actual + 10
         if actual_body_count < body_count:
             empty_row = [""] * len(header_row)
             for _ in range(body_count - actual_body_count):
@@ -323,10 +315,10 @@ if agg_df is not None:
 
         data = [header_row] + body_rows + [total_row]
 
-        # header height increased (3 rows feel); keep body rows compact/tight
-        header_row_height = 54   # increased to give 3-row visual header (you can tweak this)
-        body_row_height = 16     # compact row height for tight spacing
-        total_row_height = body_row_height + 4
+        # header height increased (3 rows feel); body rows compact/tight (reduced by 25%)
+        header_row_height = 40   # reduced by ~25% from previous 54
+        body_row_height = 12     # reduced by ~25% from previous 16
+        total_row_height = 16    # adjusted accordingly
 
         # make sure rowHeights list length matches data rows
         row_heights = [header_row_height] + [body_row_height] * body_count + [total_row_height]
@@ -371,7 +363,12 @@ if agg_df is not None:
         elements.append(Spacer(1,12))
 
         sig_img = "sarsign.png"
-        sign_table = Table([[Image(sig_img,width=150,height=50), Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]], colWidths=[0.5*available_width,0.5*available_width])
+        try:
+            sign_img = Image(sig_img,width=150,height=50)
+        except Exception:
+            sign_img = Paragraph("", normal)
+
+        sign_table = Table([[sign_img, Paragraph("Signed by ………………… for RNA Resources Group Ltd - Landmark (Babyshop)", normal)]], colWidths=[0.5*available_width,0.5*available_width])
         sign_table.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"MIDDLE"),("ALIGN",(0,0),(0,0),"LEFT"),("ALIGN",(1,0),(1,0),"RIGHT"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("FONTSIZE",(0,0),(-1,-1),8)]))
         elements.append(sign_table)
 
