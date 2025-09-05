@@ -1,4 +1,4 @@
-# proforma_v12.9.3_fix_row3_right_table10rows_reduced_heights_header_multiline_centered_hdrwhite.py
+# proforma_v12.9.3_fix_row3_right_table10rows_reduced_heights_header_multiline_centered_hdrwhite_rowdiv_blank.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.9.3 - header white, titles black)")
+st.title("📑 Proforma Invoice Generator (v12.9.3 - header white, titles black, row dividers blank)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -293,7 +293,7 @@ if agg_df is not None:
 
         elements.append(header_table)
 
-        # ---------------------- ITEMS / STYLE TABLE (header white, titles black) ----------------------
+        # ---------------------- ITEMS / STYLE TABLE (header white, titles black, row dividers blank) ----------------------
         header_labels = [
             "STYLE NO.",
             "ITEM DESCRIPTION",
@@ -306,20 +306,16 @@ if agg_df is not None:
             "AMOUNT"
         ]
 
-        # create Paragraph objects for header with centered alignment
         header_par_style = ParagraphStyle("tbl_header", parent=normal, alignment=1, fontName="Helvetica-Bold", fontSize=6.5, leading=8, textColor=colors.black)
         header_row = [Paragraph(lbl, header_par_style) for lbl in header_labels]
 
-        # body rows as before
         body_rows = [list(row) for _, row in agg_df.iterrows()]
         total_row = ["TOTAL","","","","","",f"{int(agg_df['QTY'].sum()):,}","USD",f"{agg_df['AMOUNT'].astype(float).sum():,.2f}"]
 
-        # add 10 extra blank rows irrespective of actual body count
         EXTRA_BLANK_ROWS = 10
         actual_body_count = len(body_rows)
         body_count = actual_body_count + EXTRA_BLANK_ROWS
 
-        # pad body with empty rows to reach actual + 10
         if actual_body_count < body_count:
             empty_row = [""] * len(header_row)
             for _ in range(body_count - actual_body_count):
@@ -327,24 +323,28 @@ if agg_df is not None:
 
         data = [header_row] + body_rows + [total_row]
 
-        # header height increased (3 rows feel); body rows compact/tight
         header_row_height = 40
         body_row_height = 12
         total_row_height = 16
         row_heights = [header_row_height] + [body_row_height] * body_count + [total_row_height]
 
-        # reduced font sizes for body
         body_font_size = 7
 
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
 
-        # header background set to white; header text black; underline preserved.
+        # Strategy:
+        # 1) draw a black vertical+horizontal grid for the body (so we get column lines)
+        # 2) draw a black underline for the header
+        # 3) overwrite all horizontal lines in the body to WHITE so only vertical column dividers remain visible
         items_style = TableStyle([
-            ("LINEBELOW",(0,0),(-1,0),0.35,colors.black),    # stronger line below header
+            # initial grid for body (gives vertical separators)
             ("GRID",(0,1),(-1,-1),0.25,colors.black),
-            ("BACKGROUND",(0,0),(-1,0),colors.white),       # header background white
-            ("TEXTCOLOR",(0,0),(-1,0),colors.black),       # header text black
-            ("ALIGN",(0,0),(-1,-1),"CENTER"),              # center everything (header + body)
+            # header underline strong
+            ("LINEBELOW",(0,0),(-1,0),0.35,colors.black),
+            # make header background white and text black
+            ("BACKGROUND",(0,0),(-1,0),colors.white),
+            ("TEXTCOLOR",(0,0),(-1,0),colors.black),
+            ("ALIGN",(0,0),(-1,-1),"CENTER"),
             ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
             ("FONTSIZE",(0,0),(-1,0),6.5),
             ("FONTSIZE",(0,1),(-1,-1),body_font_size),
@@ -352,8 +352,13 @@ if agg_df is not None:
             ("LEFTPADDING",(0,0),(-1,-1),3),
             ("RIGHTPADDING",(0,0),(-1,-1),3),
         ])
+        # overwrite horizontal lines in body to white (effectively blanking row dividers)
+        items_style.add("LINEBELOW",(0,1),(-1,-1),0.25,colors.white)
+
+        # keep total row styling
         items_style.add("FONTNAME",(0,len(data)-1),(-1,len(data)-1),"Helvetica-Bold")
         items_style.add("BACKGROUND",(0,len(data)-1),(-1,len(data)-1),colors.lightgrey)
+
         items_table.setStyle(items_style)
         # --------------------------------------------------------------------------------------------
 
