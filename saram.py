@@ -1,4 +1,4 @@
-# proforma_v12.9.3_footer_sign_and_words_tweaks.py
+# proforma_v12.9.3_footer_final_tweaks.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -150,18 +150,20 @@ if agg_df is not None:
         label_small=ParagraphStyle("label_small", parent=normal, fontName="Helvetica-Bold", fontSize=7)
         value_small=ParagraphStyle("value_small", parent=normal, fontName="Helvetica", fontSize=7, leading=8)
 
-        # new small bold style for amount-in-words (50% smaller + bold)
-        # original roughly 8pt; half -> 4pt (use 5 for readability)
+        # amount-in-words style increased by 25% (5 -> 6)
         amount_words_style = ParagraphStyle(
             "amount_words_style",
             parent=normal,
             fontName="Helvetica-Bold",
-            fontSize=5,
-            leading=6,
-            alignment=0  # left-align (we'll keep it full width)
+            fontSize=6,   # increased ~25% from previous 5
+            leading=7,
+            alignment=0
         )
 
-        # small styles used for signature/footer
+        # terms style reduced by 25% (8 -> 6)
+        terms_small = ParagraphStyle("terms_small", parent=normal, fontName="Helvetica", fontSize=6, leading=7)
+
+        # footer small styles
         footer_small_left = ParagraphStyle("footer_left", parent=normal, fontName="Helvetica", fontSize=7, leading=8)
         footer_small_right = ParagraphStyle("footer_right", parent=normal, fontName="Helvetica", fontSize=7, leading=8, alignment=2)
 
@@ -393,30 +395,27 @@ if agg_df is not None:
         items_style.add("LINEBELOW",(0,1),(-1,1),0.25,colors.white)
 
         # Now add spans for total row according to new plan:
-        #  - TOTAL spans 0..4
         items_style.add("SPAN",(0,total_row_idx),(4,total_row_idx))
         items_style.add("ALIGN",(0,total_row_idx),(4,total_row_idx),"CENTER")
         items_style.add("FONTNAME",(0,total_row_idx),(4,total_row_idx),"Helvetica-Bold")
         items_style.add("FONTSIZE",(0,total_row_idx),(4,total_row_idx),8)
         items_style.add("VALIGN",(0,total_row_idx),(4,total_row_idx),"MIDDLE")
 
-        #  - merge qty cell: 5..6 and center the qty
         items_style.add("SPAN",(5,total_row_idx),(6,total_row_idx))
         items_style.add("ALIGN",(5,total_row_idx),(6,total_row_idx),"CENTER")
         items_style.add("FONTNAME",(5,total_row_idx),(6,total_row_idx),"Helvetica-Bold")
         items_style.add("FONTSIZE",(5,total_row_idx),(6,total_row_idx),7)
         items_style.add("VALIGN",(5,total_row_idx),(6,total_row_idx),"MIDDLE")
 
-        #  - merge last two columns for USD total and center the USD text
         items_style.add("SPAN",(7,total_row_idx),(8,total_row_idx))
-        items_style.add("ALIGN",(7,total_row_idx),(8,total_row_idx),"CENTER")   # centered as requested
+        items_style.add("ALIGN",(7,total_row_idx),(8,total_row_idx),"CENTER")
         items_style.add("FONTNAME",(7,total_row_idx),(8,total_row_idx),"Helvetica-Bold")
         items_style.add("FONTSIZE",(7,total_row_idx),(8,total_row_idx),7)
+
         # make a clear horizontal line above the total row (black)
         items_style.add("LINEABOVE",(0,total_row_idx),(-1,total_row_idx),0.5,colors.black)
 
-        # ensure vertical black separators at the end of the TOTAL merged cell (after col 4)
-        # and at the end of the merged qty (after col 6)
+        # ensure vertical black separators after col4 and after col6 in total row
         items_style.add("LINEAFTER",(4,total_row_idx),(4,total_row_idx),0.6,colors.black)
         items_style.add("LINEAFTER",(6,total_row_idx),(6,total_row_idx),0.6,colors.black)
 
@@ -442,68 +441,59 @@ if agg_df is not None:
 
         elements.append(items_table)
 
-        # ------------------ AMOUNT IN WORDS (smaller + bold + 3 spaces after TOTAL) ---------------
+        # ------------------ AMOUNT IN WORDS (bigger + bold + 3 spaces after TOTAL) ---------------
         amount_words = amount_to_words(total_amount)
-        # Add 3 non-breaking spaces after TOTAL so layout conserves them
         words_para = Paragraph(f"<b>TOTAL&nbsp;&nbsp;&nbsp;US DOLLAR {amount_words}</b>", amount_words_style)
-        # Make this inner table grid white (hide lines beneath); outer frame will still draw
+        # Hide inner grid lines below this block by not using any inner GRIDs; use white grid to be safe
         words_table = Table([[words_para]], colWidths=[available_width])
         words_table.setStyle(TableStyle([
-            ("GRID",(0,0),(-1,-1),0.25,colors.white),   # hide inner grid lines for this block
+            ("GRID",(0,0),(-1,-1),0.25,colors.white),
             ("LEFTPADDING",(0,0),(-1,-1),4),
             ("RIGHTPADDING",(0,0),(-1,-1),4),
         ]))
         elements.append(words_table)
         # -----------------------------------------------------------------------------------------
 
-        # Terms block: keep visually minimal; hide its internal grid (white)
-        terms_table = Table([[Paragraph("Terms & Conditions (if any):", normal)]], colWidths=[available_width])
+        # Terms block (reduced by 25%)
+        terms_para = Paragraph("Terms & Conditions (if any):", terms_small)
+        terms_table = Table([[terms_para]], colWidths=[available_width])
         terms_table.setStyle(TableStyle([
             ("GRID",(0,0),(-1,-1),0.25,colors.white),
-            ("FONTSIZE",(0,0),(-1,-1),8),
             ("LEFTPADDING",(0,0),(-1,-1),4),
-            ("RIGHTPADDING",(0,0),(-1,-1),4)
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
         ]))
         elements.append(terms_table)
 
-        # two line breaks spacer (e)
+        # two small line breaks spacer
         elements.append(Spacer(1,12))
         elements.append(Spacer(1,12))
 
-        # ------------------ SIGN IMAGE (bigger + shifted right by spacer columns) ------------
+        # ------------------ SIGN IMAGE (left aligned now) ------------
         sig_img = "sarsign.png"
-        # attempt to load; if missing, keep placeholder
         try:
-            sign_img = Image(sig_img, width=220, height=80)  # bigger image
+            sign_img = Image(sig_img, width=220, height=80)  # keep bigger
         except Exception:
             sign_img = Paragraph("", normal)
 
-        # Shift right by adding two empty/blank columns before the image.
-        # We'll make a 3-col row: small left blank, small blank, then the image on the right.
-        # Column widths chosen so image sits close to right outer edge.
-        spacer_w = available_width * 0.02
-        left_w = available_width * 0.6
-        img_w = available_width - left_w - (spacer_w * 2)
-        # ensure reasonable img col width
-        colw = [left_w, spacer_w, img_w]
-        sign_row = Table([[ "", "", sign_img ]], colWidths=colw)
+        # Put signature in left column
+        sign_row = Table([[sign_img, ""]], colWidths=[0.5*available_width, 0.5*available_width])
         sign_row.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-            ("ALIGN",(2,0),(2,0),"RIGHT"),
-            ("LEFTPADDING",(0,0),(-1,-1),0),
-            ("RIGHTPADDING",(0,0),(-1,-1),0),
+            ("ALIGN",(0,0),(0,0),"LEFT"),
+            ("LEFTPADDING",(0,0),(-1,-1),4),
+            ("RIGHTPADDING",(0,0),(-1,-1),4),
             ("TOPPADDING",(0,0),(-1,-1),2),
             ("BOTTOMPADDING",(0,0),(-1,-1),2),
         ]))
         elements.append(sign_row)
 
-        # two small line breaks after sign image (already added two spaces earlier, but keep two more)
+        # two small line breaks after sign image
         elements.append(Spacer(1,8))
         elements.append(Spacer(1,8))
 
-        # f) & g) Footer bottom line: left signed text and right "for RNA..." text
-        left_footer = Paragraph("Signed by ……………………. (Affix Stamp here)", footer_small_left)
-        right_footer = Paragraph("for RNA Resources Group Ltd-Landmark (Babyshop)", footer_small_right)
+        # f) & g) Footer bottom line: left signed text and right "for RNA..." text (smaller)
+        left_footer = Paragraph("Signed by ……………………. (Affix Stamp here)", ParagraphStyle("fl", parent=normal, fontSize=6))
+        right_footer = Paragraph("for RNA Resources Group Ltd-Landmark (Babyshop)", ParagraphStyle("fr", parent=normal, fontSize=6, alignment=2))
         footer_row = Table([[left_footer, right_footer]], colWidths=[0.5*available_width, 0.5*available_width])
         footer_row.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
@@ -516,10 +506,10 @@ if agg_df is not None:
         ]))
         elements.append(footer_row)
 
-        # Outer frame: keep full-frame grid; inner blocks had white grids where requested
+        # ---------------- Outer frame: use BOX only so inner horizontal dividers are invisible ----------------
         outer_table = Table([[e] for e in elements], colWidths=[content_width])
         outer_table.setStyle(TableStyle([
-            ("GRID",(0,0),(-1,-1),0.75,colors.black),  # outer frame stays visible
+            ("BOX",(0,0),(-1,-1),0.75,colors.black),    # only outer frame
             ("VALIGN",(0,0),(-1,-1),"TOP"),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
