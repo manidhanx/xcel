@@ -1,4 +1,4 @@
-# proforma_v12.9.3_currency_shift_4spacers_5breaks.py
+# proforma_v12.9.3_currency_shift_5spacers_8breaks.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -268,11 +268,11 @@ if agg_df is not None:
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # === NEW: Row4 right - add FIVE line breaks and shift right by 4 spacer columns ===
-        currency_para = Paragraph("<br/><br/><br/><br/><br/>CURRENCY: USD", row1_normal)
+        # === NEW: Row4 right - add EIGHT line breaks and shift right by 5 spacer columns ===
+        currency_para = Paragraph("<br/><br/><br/><br/><br/><br/><br/><br/>CURRENCY: USD", row1_normal)
 
-        # Create 4 spacer columns + 1 column for the currency itself.
-        spacer_count = 4
+        # Create 5 spacer columns + 1 column for the currency itself.
+        spacer_count = 5
         spacer_fraction = 0.08  # fraction of right_width to use per spacer column
         spacer_w = max(8, right_width * spacer_fraction)
         last_col_w = max(40, right_width - (spacer_w * spacer_count))
