@@ -1,4 +1,4 @@
-# proforma_v12.8.9.py
+# proforma_v12.8.9_patch_row34_more_height.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -31,7 +31,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.8.9)")
+st.title("📑 Proforma Invoice Generator (v12.8.9 - row34 height patch)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -190,8 +190,8 @@ if agg_df is not None:
         if indent_inside_right_corrected < 0:
             indent_inside_right_corrected = 0
 
-        # final extra left shift to place ':-' and answers near ORIGIN (tuned)
-        extra_left_shift = col_widths[6] * 3  # moved left by 3*QTY width previously — keep it
+        # final extra left shift (empirical)
+        extra_left_shift = col_widths[6] * 3
         spacer_cand = indent_inside_right_corrected - extra_left_shift
         spacer_to_origin = max(0, spacer_cand)
 
@@ -203,13 +203,13 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ]))
 
-        # LEFT: supplier (breather restored on right so centre divider has space)
+        # LEFT: supplier (breather restored on right)
         supplier_title = Table([
             [Paragraph("Supplier Name:", supplier_label)],
             [Paragraph("SAR APPARELS INDIA PVT.LTD.", supplier_company)]
         ], colWidths=[left_width])
         supplier_title.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),6),  # more breathing on right
+            ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),6),
             ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),2),
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
@@ -232,11 +232,10 @@ if agg_df is not None:
         ]))
 
         # RIGHT: top (PI) and bottom (order ref)
-        # reduce row1-right breathing (LEFTPADDING) slightly so it doesn't sit too far right
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
         right_top.setStyle(TableStyle([
-            ("LEFTPADDING",(0,0),(-1,-1),2),  # reduced breathing to move left a bit
+            ("LEFTPADDING",(0,0),(-1,-1),2),
             ("RIGHTPADDING",(0,0),(-1,-1),3),
             ("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),
             ("VALIGN",(0,0),(-1,-1),"TOP"),
@@ -262,7 +261,7 @@ if agg_df is not None:
             ("LEFTPADDING",(0,0),(0,1),2),("RIGHTPADDING",(0,0),(0,1),0)
         ]))
 
-        # ROW2 LEFT: Consignee (restore breathing on right to match supplier)
+        # ROW2 LEFT: Consignee
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", row1_normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([
@@ -271,7 +270,7 @@ if agg_df is not None:
             ("VALIGN",(0,0),(-1,-1),"TOP")
         ]))
 
-        # ROW2 RIGHT: Payment & Bank block (breather preserved)
+        # ROW2 RIGHT: Payment & Bank block
         pay_label = Paragraph("Payment Term:", label_small)
         pay_value = Paragraph(payment_term_val, value_small)
         pay_term_tbl = Table([[pay_label, pay_value]], colWidths=[right_width*0.28, right_width*0.72])
@@ -318,12 +317,12 @@ if agg_df is not None:
         payment_block = Table([[pay_term_tbl],[blank_row],[bank_heading_tbl],[bank_inner]], colWidths=[right_width])
         payment_block.setStyle(TableStyle([
             ("VALIGN",(0,0),(-1,-1),"TOP"),
-            ("LEFTPADDING",(0,0),(-1,-1),4),   # breathing preserved
+            ("LEFTPADDING",(0,0),(-1,-1),4),
             ("RIGHTPADDING",(0,0),(-1,-1),2),
             ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)
         ]))
 
-        # ROW3 & ROW4: same font size (row1_normal) and make their heights match
+        # ROW3 & ROW4: increased heights and same font
         left_row3_para = Paragraph(
             f"<b>Loading Country:</b> {made_in or ''}<br/>"
             f"<b>Port of Loading:</b> {loading_port or ''}<br/>"
@@ -348,18 +347,17 @@ if agg_df is not None:
         right_row4_box = Table([[right_row4_para]], colWidths=[right_width])
         right_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # assemble header table — set rowHeights so row3 and row4 match
-        # rowHeights: row0 (row1) automatic, row1 (row2) automatic, row2 (row3) 38, row3 (row4) 38
+        # assemble header table — increase row3 & row4 heights (both set to 56)
         header_table = Table([
             [supplier_stack, right_stack],
             [consignee_box, payment_block],
             [left_row3_box, right_row3_box],
             [left_row4_box, right_row4_box]
-        ], colWidths=[left_width, right_width], rowHeights=[None, None, 38, 38])
+        ], colWidths=[left_width, right_width], rowHeights=[None, None, 56, 56])
 
         header_table.setStyle(TableStyle([
             ("VALIGN",(0,0),(1,3),"TOP"),
-            ("LINEAFTER",(0,0),(0,3),0.75,colors.black),    # vertical centre divider full height
+            ("LINEAFTER",(0,0),(0,3),0.75,colors.black),
             ("LINEBELOW",(0,0),(1,0),0.35,colors.black),
             ("LINEBELOW",(0,1),(1,1),0.35,colors.black),
             ("LINEBELOW",(0,2),(1,2),0.35,colors.black),
@@ -371,10 +369,9 @@ if agg_df is not None:
         ]))
 
         elements.append(header_table)
-        # removed extra spacer / empty block — only subtle gap below header
-        elements.append(Spacer(1,2))
+        # removed any extra spacer — no blank row above style table
 
-        # Items table
+        # ---------------- items table ----------------
         data=[list(agg_df.columns)]
         for _,row in agg_df.iterrows():
             data.append(list(row))
