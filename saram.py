@@ -32,7 +32,7 @@ def amount_to_words(amount):
     return words + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.3.3 Pure Reference)")
+st.title("📑 Proforma Invoice Generator (v12.3.4 Pure Reference)")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
@@ -160,12 +160,12 @@ if agg_df is not None:
         style_col_width = table_width * style_prop
         supplier_inner_col2 = left_width - style_col_width
 
-        # --- Build header_section table: title row, supplier/payment row, shipment row ---
+        # --- Build header_section table: title row, supplier/payment row, consignee/shipment row ---
         title_para = Paragraph("<b>PROFORMA INVOICE</b>", ParagraphStyle("title", parent=normal, alignment=1, fontSize=7))
 
+        # Supplier block: label on same horizontal baseline with company name on same (or next) line as requested earlier:
         supplier_lines = [
-            [Paragraph("Supplier Name:", label_small), Paragraph("", value_small)],   # empty second cell; company next line
-            [Paragraph("", label_small), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],
+            [Paragraph("Supplier Name:", label_small), Paragraph("SAR APPARELS INDIA PVT.LTD.", small_bold)],
             [Paragraph("Address:", label_small), Paragraph("6, Picaso Bithi, Kolkata - 700017", value_small)],
             [Paragraph("Phone:", label_small), Paragraph("9817473373", value_small)],
             [Paragraph("Fax:", label_small), Paragraph("N.A.", value_small)]
@@ -185,45 +185,49 @@ if agg_df is not None:
                                           ("TOPPADDING",(0,0),(-1,-1),0),
                                           ("BOTTOMPADDING",(0,0),(-1,-1),0),]))
 
-        payment_lines = f"PI No.: {pi_no}<br/>Landmark order Reference: {order_no}<br/>Buyer Name: {buyer_name}<br/>Brand Name: {brand_name}"
+        # Payment Terms block (right, row1)
+        payment_lines = f"<b>Payment Terms:</b><br/>{payment_term}<br/><b>PI No.:</b> {pi_no}<br/><b>Buyer:</b> {buyer_name}"
         payment_para = Paragraph(payment_lines, normal)
-        consignee_lines = f"Consignee:<br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}"
-        consignee_para = Paragraph(consignee_lines, normal)
-
         payment_box = Table([[payment_para]], colWidths=[right_width])
-        payment_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),
-                                        ("RIGHTPADDING",(0,0),(-1,-1),4),
-                                        ("TOPPADDING",(0,0),(-1,-1),4),
-                                        ("BOTTOMPADDING",(0,0),(-1,-1),4),]))
-        consignee_box = Table([[consignee_para]], colWidths=[right_width])
-        consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),
-                                          ("RIGHTPADDING",(0,0),(-1,-1),4),
+        payment_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),
+                                        ("RIGHTPADDING",(0,0),(-1,-1),6),
+                                        ("TOPPADDING",(0,0),(-1,-1),6),
+                                        ("BOTTOMPADDING",(0,0),(-1,-1),6),]))
+
+        # Consignee block moved to LEFT below supplier (row2, left)
+        consignee_lines = f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}"
+        consignee_para = Paragraph(consignee_lines, normal)
+        consignee_box = Table([[consignee_para]], colWidths=[left_width])
+        consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),
+                                          ("RIGHTPADDING",(0,0),(-1,-1),2),
                                           ("TOPPADDING",(0,0),(-1,-1),4),
                                           ("BOTTOMPADDING",(0,0),(-1,-1),4),]))
 
-        # right column stack
-        right_nested = Table([[payment_box],[consignee_box]], colWidths=[right_width])
-        right_nested.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),
-                                          ("LEFTPADDING",(0,0),(-1,-1),0),
-                                          ("RIGHTPADDING",(0,0),(-1,-1),0),
-                                          ("TOPPADDING",(0,0),(-1,-1),0),
-                                          ("BOTTOMPADDING",(0,0),(-1,-1),0),]))
+        # shipment (placed in right column row2 to keep grid intact or can span both; we'll place in right column)
+        shipment_para_left = Paragraph(f"<b>Loading Country:</b> {made_in}<br/><b>Agreed Shipment Date:</b> {ship_date}", normal)
+        shipment_para_right = Paragraph(f"<b>Port of Loading:</b> {loading_port}<br/><b>Description of goods:</b> {order_of}", normal)
+        shipment_left_box = Table([[shipment_para_left]], colWidths=[left_width])
+        shipment_right_box = Table([[shipment_para_right]], colWidths=[right_width])
+        shipment_left_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
+        shipment_right_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4)]))
 
-        # shipment as two paragraphs so no internal vertical line appears
-        left_ship = Paragraph(f"<b>Loading Country:</b> {made_in}<br/><b>Agreed Shipment Date:</b> {ship_date}", normal)
-        right_ship = Paragraph(f"<b>Port of Loading:</b> {loading_port}<br/><b>Description of goods:</b> {order_of}", normal)
-
-        # header_section table (3 rows)
+        # header_section arrangement:
+        # row0: title (spans both)
+        # row1: supplier_box (left) | payment_box (right)
+        # row2: consignee_box (left) | shipment_right_box (right)  <-- shipment left/right split to keep divider alignment
         header_section = Table([
             [title_para, ""],
-            [supplier_box, right_nested],
-            [left_ship, right_ship]
+            [supplier_box, payment_box],
+            [consignee_box, shipment_right_box]
         ], colWidths=[left_width, right_width])
         header_section.setStyle(TableStyle([
             ("SPAN",(0,0),(1,0)),               # title spans both cols
             ("ALIGN",(0,0),(1,0),"CENTER"),
             ("VALIGN",(0,0),(1,0),"MIDDLE"),
-            ("LINEAFTER",(0,0),(0,2),0.75,colors.black),  # vertical divider through rows 0..2
+            # horizontal line below title to visually anchor divider start
+            ("LINEBELOW",(0,0),(1,0),0.75,colors.black),
+            # vertical divider through rows 1..2 (so it starts under the title and goes through supplier/payment/consignee/shipment area)
+            ("LINEAFTER",(0,1),(0,2),0.75,colors.black),
             ("LEFTPADDING",(0,0),(-1,-1),0),
             ("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),
@@ -233,7 +237,7 @@ if agg_df is not None:
         elements.append(header_section)
         elements.append(Spacer(1,8))
 
-        # --- Main Items Table (unchanged) ---
+        # --- Main Items Table ---
         data=[list(agg_df.columns)]
         for _,row in agg_df.iterrows(): data.append(list(row))
         total_qty=agg_df["QTY"].sum()
