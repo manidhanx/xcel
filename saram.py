@@ -92,9 +92,6 @@ if uploaded_file:
             st.error("❌ Could not detect Qty/Style column.")
         else:
             aggregated_data=[]
-            valid_styles = df[style_col].dropna().astype(str)
-valid_styles = valid_styles[~valid_styles.str.strip().isin(["0","nan","","#REF!"])]
-
 for style in valid_styles.unique():
             for style in df[style_col].dropna().unique():
                 rows=df[df[style_col]==style]
