@@ -1,4 +1,4 @@
-# proforma_v12.9.3_final_master_align_v2.py
+# proforma_v12.9.3_final_with_qty_fix.py
 import streamlit as st
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer
@@ -31,9 +31,12 @@ def amount_to_words(amount):
     return s + " ONLY"
 
 st.set_page_config(page_title="Proforma Invoice Generator", layout="centered")
-st.title("📑 Proforma Invoice Generator (v12.9.3)")
+st.title("📑 Proforma Invoice Generator (v12.9.3) — Fixed Qty Aggregation")
 
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
+
+# debug toggle
+show_debug_tables = st.checkbox("Show per-style debug table (qty sums)", value=False)
 
 agg_df = None
 order_no = made_in = loading_port = ship_date = order_of = texture = country_of_origin = None
@@ -75,44 +78,114 @@ if uploaded_file:
     if header_row_idx is None:
         st.error("❌ Could not find 'Style' header.")
     else:
+        # read data with multi-row header (as before)
         df = pd.read_excel(uploaded_file, header=[header_row_idx, header_row_idx+1])
         df.columns = [" ".join([str(x) for x in col if str(x)!="nan"]).strip() for col in df.columns.values]
         df = df.dropna(how="all")
 
+        # --- Detect key columns (style, qty via 'value' heuristic, fob) ---
         style_col = next((c for c in df.columns if str(c).strip().lower().startswith("style")), None)
         qty_col, value_col_index = None, None
         for idx, col in enumerate(df.columns):
             if "value" in str(col).lower():
-                value_col_index = idx; break
+                value_col_index = idx
+                break
         if value_col_index and value_col_index>0:
             qty_col = df.columns[value_col_index-1]
+        # fallback: look for columns containing 'qty' or 'quantity'
+        if not qty_col:
+            candidates = [c for c in df.columns if 'qty' in str(c).lower() or 'quantity' in str(c).lower()]
+            if candidates:
+                qty_col = candidates[0]
         fob_col = next((c for c in df.columns if "fob" in str(c).lower()), None)
 
         if not style_col or not qty_col:
             st.error("❌ Could not detect Qty/Style column.")
         else:
-            aggregated_data=[]
-            for style in df[style_col].dropna().unique():
-                rows=df[df[style_col]==style]
-                if len(rows)>0:
-                    r=rows.iloc[0]
-                    desc=r.iloc[1] if len(r)>1 else ""
-                    comp=r.iloc[2] if len(r)>2 else ""
-                    total_qty=pd.to_numeric(rows[qty_col],errors='coerce').fillna(0).sum()
-                    unit_price=0
-                    if fob_col and fob_col in rows.columns:
-                        prices=pd.to_numeric(rows[fob_col],errors='coerce').fillna(0)
-                        nz=prices[prices>0]; unit_price=nz.iloc[0] if len(nz)>0 else 0
-                    amount=total_qty*unit_price
-                    aggregated_data.append([style,desc,texture or "Knitted","61112000",comp,
-                                            country_of_origin or "India",int(total_qty),f"{unit_price:.2f}",f"{amount:.2f}"])
-            agg_df=pd.DataFrame(aggregated_data,columns=[
+            # ----------------- PATCH: Forward-fill style + clean qty & fob -----------------
+            # 1) Ensure style column is string and convert empty-like to pd.NA
+            df[style_col] = df[style_col].astype(str).replace(['nan','None','NoneType'],'').replace(r'^\s*$','',regex=True)
+            # convert empty strings to NA then forward-fill
+            df[style_col] = df[style_col].replace(r'^\s*$', pd.NA, regex=True)
+            df[style_col] = df[style_col].ffill().astype(str).str.strip()
+
+            # 2) Clean qty column to numeric robustly
+            # If qty_col exists, sanitize: remove commas, non-digit except dot/minus
+            if qty_col in df.columns:
+                clean_qty_series = (df[qty_col]
+                                    .astype(str)
+                                    .str.replace(r'[^\d\.-]', '', regex=True)
+                                    .replace('', '0'))
+                df['_QTY_CLEAN'] = pd.to_numeric(clean_qty_series, errors='coerce').fillna(0.0).astype(float)
+            else:
+                df['_QTY_CLEAN'] = 0.0
+
+            # 3) Clean FOB/Unit price
+            if fob_col and fob_col in df.columns:
+                clean_fob = (df[fob_col]
+                             .astype(str)
+                             .str.replace(r'[^\d\.-]', '', regex=True)
+                             .replace('', '0'))
+                df['_FOB_CLEAN'] = pd.to_numeric(clean_fob, errors='coerce').fillna(0.0).astype(float)
+            else:
+                df['_FOB_CLEAN'] = 0.0
+
+            # 4) trim whitespace on all string columns (safe)
+            str_cols = df.select_dtypes(include=['object']).columns
+            for c in str_cols:
+                df[c] = df[c].astype(str).str.strip()
+
+            # Debug table per-style (optional)
+            per_style_debug = df.groupby(style_col)['_QTY_CLEAN'].agg(['count','sum']).reset_index().rename(columns={'sum':'agg_qty'})
+            if show_debug_tables:
+                st.write("### Per-style qty debug (after forward-fill & clean)")
+                st.dataframe(per_style_debug)
+
+            # 5) Better detection for description/composition columns in the parsed header
+            desc_col = next((c for c in df.columns if 'description' in str(c).lower()), None)
+            comp_col = next((c for c in df.columns if 'composition' in str(c).lower()), None)
+            # fallback choices (by position) if not found
+            if not desc_col and len(df.columns) >= 2:
+                desc_col = df.columns[1]
+            if not comp_col and len(df.columns) >= 4:
+                comp_col = df.columns[4] if len(df.columns) > 4 else None
+
+            # ----------------- Aggregate using cleaned fields -----------------
+            aggregated_data = []
+            # group by style (ffilled) and compute sums
+            grouped = df.groupby(style_col, sort=False)
+            for style, group in grouped:
+                s = str(style).strip()
+                if s.lower() in ['', 'nan', 'none']:
+                    continue
+                # description and composition: prefer detected columns else try positions
+                first_row = group.iloc[0]
+                desc = first_row[desc_col] if desc_col in group.columns and desc_col is not None else (first_row.iloc[1] if len(first_row)>1 else "")
+                comp = first_row[comp_col] if comp_col in group.columns and comp_col is not None else (first_row.iloc[4] if len(first_row)>4 else "")
+                total_qty = int(round(group['_QTY_CLEAN'].sum()))
+                # pick first non-zero FOB in group if exists
+                nzf = group['_FOB_CLEAN'][group['_FOB_CLEAN'] > 0]
+                unit_price = float(nzf.iloc[0]) if len(nzf) > 0 else 0.0
+                amount = total_qty * unit_price
+                aggregated_data.append([
+                    s,
+                    desc or "",
+                    texture or "Knitted",
+                    "61112000",
+                    comp or "",
+                    country_of_origin or "India",
+                    total_qty,
+                    f"{unit_price:.2f}",
+                    f"{amount:.2f}"
+                ])
+
+            agg_df = pd.DataFrame(aggregated_data, columns=[
                 "STYLE NO.","ITEM DESCRIPTION","FABRIC TYPE","H.S NO","COMPOSITION","ORIGIN","QTY","FOB","AMOUNT"
             ])
-            st.write("### ✅ Parsed Order Data")
+            st.write("### ✅ Parsed & Aggregated Order Data")
             st.dataframe(agg_df)
 
-# inputs & generate
+# --- Inputs & PDF generation (unchanged layout code, with fixes preserved) ---
 if agg_df is not None:
     st.write("### ✍️ Enter Invoice Details")
     today_str = datetime.today().strftime("%d/%m/%Y")
@@ -131,7 +204,7 @@ if agg_df is not None:
         doc=SimpleDocTemplate(pdf_file,pagesize=A4,leftMargin=30,rightMargin=30,topMargin=30,bottomMargin=30)
         styles=getSampleStyleSheet(); normal=styles["Normal"]
 
-        # Styles
+        # Styles (kept same as your last working version)
         title_style = ParagraphStyle("title", parent=normal, alignment=1, fontSize=7)
         supplier_label = ParagraphStyle("supplier_label", parent=normal, fontName="Helvetica-Bold", fontSize=8)
         supplier_company = ParagraphStyle("supplier_company", parent=normal, fontName="Helvetica-Bold", fontSize=7)
@@ -148,7 +221,7 @@ if agg_df is not None:
 
         elements=[]; content_width = A4[0] - 110; available_width = content_width - 0.5
 
-        # Columns
+        # Columns / widths (same proportions)
         props = [0.125, 0.185, 0.12, 0.10, 0.15, 0.08, 0.07, 0.08, 0.09]
         total_prop = sum(props); props = [p/total_prop for p in props]
         col_widths = [available_width * p for p in props]
@@ -156,7 +229,7 @@ if agg_df is not None:
         if abs(diff) > 0: col_widths[-1] += diff
         left_width = sum(col_widths[:3]); right_width = available_width - left_width
 
-        # Align “origin” for bank answers
+        # compute spacer_to_origin similar to previous logic
         origin_left_absolute = sum(col_widths[:5])
         indent_inside_right = origin_left_absolute - left_width
         items_cell_left_padding = 4
@@ -164,10 +237,8 @@ if agg_df is not None:
         extra_left_shift = col_widths[6] * 3
         spacer_to_origin = max(0, indent_inside_right_corrected - extra_left_shift)
 
-        # Build master header table (title row + 4 header blocks) in one two-column table
+        # --- Master header (title + 4 rows) - same as last working layout ---
         title_para = Paragraph("PROFORMA INVOICE", title_style)
-
-        # Left header (supplier)
         supplier_title = Table([
             [Paragraph("Supplier Name:", supplier_label)],
             [Paragraph("SAR APPARELS INDIA PVT.LTD.", supplier_company)]
@@ -187,7 +258,6 @@ if agg_df is not None:
         supplier_stack = Table([[supplier_title],[supplier_contact]], colWidths=[left_width])
         supplier_stack.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),6)]))
 
-        # Right top (PI)
         right_top_para = Paragraph(f"No. & date of PI: {pi_no}", right_top_style)
         right_top = Table([[right_top_para]], colWidths=[right_width])
         right_top.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),2),("RIGHTPADDING",(0,0),(-1,-1),0),
@@ -205,7 +275,7 @@ if agg_df is not None:
         right_stack = Table([[right_top],[right_bottom]], colWidths=[right_width])
         right_stack.setStyle(TableStyle([("VALIGN",(0,0),(0,1),"TOP"),("LEFTPADDING",(0,0),(0,1),2),("RIGHTPADDING",(0,0),(0,1),0)]))
 
-        # Consignee and payment blocks
+        # Consignee & Payment
         consignee_para = Paragraph(f"<b>Consignee:</b><br/>{consignee_name}<br/>{consignee_addr}<br/>{consignee_tel}", row1_normal)
         consignee_box = Table([[consignee_para]], colWidths=[left_width])
         consignee_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),
@@ -232,7 +302,7 @@ if agg_df is not None:
         add_bank_row("Account No", "2112819952")
         add_bank_row("BANK'S NAME", "KOTAK MAHINDRA BANK LTD")
         add_bank_row("BANK ADDRESS", "2 BRABOURNE ROAD, GOVIND BHAVAN, GROUND FLOOR, KOLKATA-700001")
-        add_bank_row("SWIFT CODE", "KKBKINBBCPC")
+        add_bank_row("SWIFT CODE", "KKBKINNBCPC")
         add_bank_row("BANK CODE", "0323")
 
         bank_inner = Table(bank_rows, colWidths=[label_col_w, spacer_to_origin, colon_w, value_col_w])
@@ -242,22 +312,20 @@ if agg_df is not None:
         payment_block.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),0),
                                            ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0)]))
 
-        # Row 3
+        # Row 3 & 4 blocks
         left_row3_para = Paragraph(f"<b>Loading Country:</b> {made_in or ''}<br/><b>Port of Loading:</b> {loading_port or ''}<br/><b>Agreed Shipment Date:</b> {ship_date or ''}", row1_normal)
         left_row3_box = Table([[left_row3_para]], colWidths=[left_width])
         left_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # right row3: three breaks between lines
         right_row3_para = Paragraph(f"<b>L/C Advising Bank:</b> (If applicable)<br/><br/><br/><b>Remarks:</b> (if any)", row1_normal)
         right_row3_box = Table([[right_row3_para]], colWidths=[right_width])
         right_row3_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # Row 4
         left_row4_para = Paragraph(f"<b>Description of goods:</b> {order_of or 'Value Packs'}", row1_normal)
         left_row4_box = Table([[left_row4_para]], colWidths=[left_width])
         left_row4_box.setStyle(TableStyle([("LEFTPADDING",(0,0),(-1,-1),4),("RIGHTPADDING",(0,0),(-1,-1),4),("VALIGN",(0,0),(-1,-1),"TOP")]))
 
-        # move CURRENCY to start of UNIT PRICE FOB column (index 7)
+        # place CURRENCY aligned to UNIT PRICE (FOB) column start
         unit_price_col_index = 7
         unit_left_rel_to_rightblock = sum(col_widths[:unit_price_col_index]) - left_width
         unit_left_rel_to_rightblock = max(0, unit_left_rel_to_rightblock)
@@ -274,25 +342,22 @@ if agg_df is not None:
             ("TOPPADDING",(0,0),(0,0),0),("BOTTOMPADDING",(0,0),(0,0),2),
         ]))
 
-        # Build master rows: title row spanned across both columns to keep centered, then header blocks
+        # Build master table rows and style — ensure center divider starts below title
         master_rows = []
-        master_rows.append([title_para, ""])  # we will span this row across both cols
+        title_par = Paragraph("PROFORMA INVOICE", title_style)
+        master_rows.append([title_par, ""])
         master_rows.append([supplier_stack, right_stack])
         master_rows.append([consignee_box, payment_block])
         master_rows.append([left_row3_box, right_row3_box])
         master_rows.append([left_row4_box, right_row4_box])
 
-        # create master table with 2 columns; adjust rowHeights so title row small
-        master_table = Table(master_rows, colWidths=[left_width, right_width],
-                             rowHeights=[18, None, None, 56, row4_height])
-        master_table_style = [
+        master_table = Table(master_rows, colWidths=[left_width, right_width], rowHeights=[18, None, None, 56, row4_height])
+        master_table.setStyle(TableStyle([
             ("VALIGN",(0,0),(1,4),"TOP"),
-            # center divider now starts from row 1 (so it stops at the line right below title)
-            ("LINEAFTER",(0,1),(0,4),0.75,colors.black),
-            # underline title and row separators
-            ("SPAN",(0,0),(1,0)),  # span title across both cols so it's centered
-            ("ALIGN",(0,0),(1,0),"CENTER"),("VALIGN",(0,0),(1,0),"MIDDLE"),
-            ("LINEBELOW",(0,0),(1,0),0.9,colors.black),  # title underline (thicker)
+            ("SPAN",(0,0),(1,0)),
+            ("ALIGN",(0,0),(1,0),"CENTER"),
+            ("LINEBELOW",(0,0),(1,0),0.9,colors.black),
+            ("LINEAFTER",(0,1),(0,4),0.75,colors.black),  # center divider starts from row 1
             ("LINEBELOW",(0,1),(1,1),0.35,colors.black),
             ("LINEBELOW",(0,2),(1,2),0.35,colors.black),
             ("LINEBELOW",(0,3),(1,3),0.35,colors.black),
@@ -303,8 +368,7 @@ if agg_df is not None:
             ("BOTTOMPADDING",(0,0),(-1,-1),0),
             ("BOTTOMPADDING",(0,4),(1,4),0),
             ("TOPPADDING",(0,4),(1,4),0),
-        ]
-        master_table.setStyle(TableStyle(master_table_style))
+        ]))
 
         # ---------- ITEMS TABLE ----------
         header_labels = [
@@ -332,18 +396,12 @@ if agg_df is not None:
         total_row = ["TOTAL","","","","",f"{int(total_qty):,}","",None,None]
         data.append(total_row)
 
-        # Row heights: add a small extra top breathing to the first body row
-        header_row_h = 40
-        body_row_h = 12
-        first_body_extra = 4  # extra top breathing for first body row
-        total_row_h = 16
-
-        body_count = len(body_rows)
-        if body_count >= 1:
-            # first body row gets extra height
-            row_heights = [header_row_h, body_row_h + first_body_extra] + [body_row_h]*(body_count-1) + [total_row_h]
+        header_row_h, body_row_h, total_row_h = 40, 12, 16
+        # add breathing for first body row
+        if len(body_rows) > 0:
+            row_heights = [header_row_h, body_row_h + 4] + [body_row_h]*(len(body_rows)-1) + [total_row_h]
         else:
-            row_heights = [header_row_h] + [body_row_h]*body_count + [total_row_h]
+            row_heights = [header_row_h] + [body_row_h]*len(body_rows) + [total_row_h]
 
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
         items_style = TableStyle([
@@ -393,7 +451,7 @@ if agg_df is not None:
 
         items_table.setStyle(items_style)
 
-        # update total row values
+        # update total row values (apply after style set)
         data[total_idx][7] = f"USD {total_amount:,.2f}"
         data[total_idx][8] = ""
         data[total_idx][5] = f"{int(total_qty):,}"
@@ -402,13 +460,12 @@ if agg_df is not None:
         items_table = Table(data, colWidths=col_widths, repeatRows=1, rowHeights=row_heights)
         items_table.setStyle(items_style)
 
-        # Stack master_table and items_table flush so there's no gap between them
+        # stack master and items flush (no gap)
         stacked = Table([[master_table],[items_table]], colWidths=[available_width], rowHeights=[None, None])
         stacked.setStyle(TableStyle([
             ("LEFTPADDING",(0,0),(-1,-1),0),("RIGHTPADDING",(0,0),(-1,-1),0),
             ("TOPPADDING",(0,0),(-1,-1),0),("BOTTOMPADDING",(0,0),(-1,-1),0),
         ]))
-
         elements.append(stacked)
 
         # Amount in words
